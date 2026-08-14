@@ -135,7 +135,7 @@ main {
         linear-gradient(#e9ecef 1px, transparent 1px),
         linear-gradient(90deg, #e9ecef 1px, transparent 1px);
 
-        
+
     background-size: 20px 20px;
 }
 
@@ -150,7 +150,7 @@ main {
     font-weight: bold;
 }
 
-.theory-panel {
+.right-panel {
     background-color: #ffffff;
     color: #333;
 }
@@ -165,35 +165,8 @@ main {
     border-bottom: 1px solid #ccc;
 }
 
-.right-panel ul {
-    display: flex;
-    list-style-type: none;
-    gap: 10px;
-    flex-direction: row-reverse;
-    background-color: burlywood;
-
-}
-
-.right-panel ul li {
-    margin-right: 8px;
-    cursor: pointer;
-    transition: all ease-in-out;
-}
-
-.right-panel ul li:hover {
-    transform: scale(1.2);
-    font-weight: 400;
-    margin-left: 15px;
-}
 
 
-.divider {
-    background-color: black;
-    cursor: col-resize;
-    color: white;
-
-
-}
 .theory-content {
     padding: 30px;
     line-height: 1.7;
