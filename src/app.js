@@ -107,16 +107,23 @@ inputE1.addEventListener('keydown', function(e){
        const userCommand = inputE1.value;
 
 
-         buildElement(DOM.terminalContent, 'p', userCommand, {
-            className: 'terminal-output'
-        })
+       buildElement(DOM.terminalContent, 'p', `user@git-sim:~$ ${userCommand}`, {
+           className: 'terminal-output',
+           attributes: { style: 'color: #00ff00;' } // Green to look like a prompt
+       });
 
-   
+       const systemResponse = handleCommand(userCommand);
+       if(systemResponse !== "") {
+        buildElement(DOM.terminalContent, 'p', systemResponse, {
+               className: 'terminal-output',
+               attributes: { style: 'color: #ccc; white-space: pre-wrap;' } // Gray for system output
+           });
+       }
 
        inputE1.value = "";
 
+       DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
     
-
     }
     
 });
