@@ -69,7 +69,8 @@ buildElement(newDiv, 'span', 'user@git-sim:~$ ', {
     className: 'prompt-text'
 });
 
-buildElement(newDiv, 'input', '', {
+
+ const inputE1 = buildElement(newDiv, 'input', '', {
     className: 'terminal-input',
     attributes: {
         type: 'text',
@@ -78,10 +79,8 @@ buildElement(newDiv, 'input', '', {
     }
 });
 
-buildElement(newDiv, 'p', '', {
-    className: 'terminal-output',
 
-});
+
  
 buildElement(DOM.theoryContent, 'h1', 'Understanding Git Status', {
     className: 'currentChapterHeader',
@@ -94,3 +93,42 @@ buildElement(DOM.theoryContent, 'p', 'When you type a command in the terminal on
     className: 'terminal-output-text',
 
 });
+
+const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
+    className: 'userClickedOutput',
+})
+
+//event listeners 
+
+inputE1.addEventListener('keydown', function(e){
+
+    if(e.key === 'Enter'){
+
+       const userCommand = inputE1.value;
+
+
+         buildElement(DOM.terminalContent, 'p', userCommand, {
+            className: 'terminal-output'
+        })
+
+   
+
+       inputE1.value = "";
+
+    
+
+    }
+    
+});
+
+
+DOM.terminalContent.addEventListener('click', function(e){
+    console.log(e.target);
+
+    const userClicked = e.target;
+   userClickOutput.textContent = "You Clicked a: " + userClicked.tagName;
+    
+});
+
+
+
