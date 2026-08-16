@@ -1,7 +1,6 @@
 //selectors
 const DOM = {
     terminalContent: document.querySelector('.terminal-content'),
-    terminalText: document.querySelector('.terminal-text'),
     theoryContent: document.querySelector('.theory-content'),
 
 
