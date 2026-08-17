@@ -9,7 +9,7 @@ export function setupTerminalEvents(DOM) {
         attributes: { type: 'text', placeholder: 'type a git command here ... ', autocomplete: 'off' }
     });
 
-    inputE1.addEventListener('keydown', function (e) {
+    inputE1.addEventListener('keydown',async function (e) {
         if (e.key === 'Enter') {
             const userCommand = inputE1.value;
 
@@ -27,7 +27,34 @@ export function setupTerminalEvents(DOM) {
             }
 
             inputE1.value = "";
-            DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
+        
+        
+              if (userCommand.trim().startsWith("git push")) {
+            const loadingLine = buildElement(DOM.terminalContent, 'p', "Pushing to origin...", {
+                className: 'terminal-output',
+                attributes: { style: 'color: #ccc;' }
+            });
+
+            try {
+                const result = await handleCommand(userCommand);
+                loadingLine.textContent = result;
+            } catch (err) {
+                loadingLine.textContent = err;
+                loadingLine.style.color = "#ff5f56";
+            }
+        } else {
+            const systemResponse = await handleCommand(userCommand);
+            if (systemResponse !== "") {
+                buildElement(DOM.terminalContent, 'p', systemResponse, {
+                    className: 'terminal-output',
+                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
+                });
+            }
+        }
+
+        DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
+    
+        
         }
     });
 }
