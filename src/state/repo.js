@@ -1,6 +1,6 @@
 //--- state ---
 
-let repo = {
+export let repo = {
   initialized: false,
   commits: [],       // { id, message, timestamp }
   staged: [],         // list of staged "file" names (fake — just strings for now)

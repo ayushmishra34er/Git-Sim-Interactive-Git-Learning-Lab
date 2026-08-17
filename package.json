@@ -1,0 +1,25 @@
+{
+  "name": "git-sim",
+  "version": "1.0.0",
+  "description": "A browser-based, JavaScript-simulated Git environment. Type real git commands into a terminal-style UI, watch a JS-powered engine parse and execute them against an in-memory fake repository, and see the resulting commit graph rendered live — with theory alongside so the \"why,\" not just the \"how,\" sticks.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab/issues"
+  },
+  "homepage": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab#readme"
+}
