@@ -20,7 +20,7 @@ export function handleCommand(input) {
   switch (subcommand) {
     case "init": return handleInit();
     case "add": return handleAdd(args);
-    case "commit": return handleCommit(args);
+    case "commit": return handleCommit(args.join(" "));
     case "status": return handleStatus();
     case "log": return handleLog();
     default: return `git: '${subcommand}' is not a git command`;
