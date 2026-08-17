@@ -1,4 +1,9 @@
-function handleCommand(input) {
+import { repo } from "../state/repo.js";
+import { generateId } from "../utils/idGenerators.js";
+
+
+
+export function handleCommand(input) {
   const parts = input.trim().split(" ");
   const command = parts[0]; // "git"
   const subcommand = parts[1]; // "init", "add", "commit", etc.
@@ -70,8 +75,9 @@ function handleCommit(input) {
     const message = messageMatch ? messageMatch[1] : "no message";
     
 
-    const commitId = "commit-" + Math.random().toString(36).substr(2, 5);
-
+    const commitId = generateId();
+    
+    
 
     const newCommit = {
         id: commitId, 

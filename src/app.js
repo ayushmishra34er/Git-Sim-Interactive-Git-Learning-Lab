@@ -1,3 +1,7 @@
+
+import { buildElement } from './components/buildElement.js';
+import { setupTerminalEvents } from './events/terminalEvents.js';
+
 //selectors
 const DOM = {
     terminalContent: document.querySelector('.terminal-content'),
@@ -97,45 +101,6 @@ buildElement(DOM.theoryContent, 'p', 'When you type a command in the terminal on
 const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
     className: 'userClickedOutput',
 })
-
-//event listeners 
-
-inputE1.addEventListener('keydown', function(e){
-
-    if(e.key === 'Enter'){
-
-       const userCommand = inputE1.value;
-
-
-       buildElement(DOM.terminalContent, 'p', `user@git-sim:~$ ${userCommand}`, {
-           className: 'terminal-output',
-           attributes: { style: 'color: #00ff00;' } // Green to look like a prompt
-       });
-
-       const systemResponse = handleCommand(userCommand);
-       if(systemResponse !== "") {
-        buildElement(DOM.terminalContent, 'p', systemResponse, {
-               className: 'terminal-output',
-               attributes: { style: 'color: #ccc; white-space: pre-wrap;' } // Gray for system output
-           });
-       }
-
-       inputE1.value = "";
-
-       DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
-    
-    }
-    
-});
-
-
-DOM.terminalContent.addEventListener('click', function(e){
-    console.log(e.target);
-
-    const userClicked = e.target;
-   userClickOutput.textContent = "You Clicked a: " + userClicked.tagName;
-    
-});
 
 
 
