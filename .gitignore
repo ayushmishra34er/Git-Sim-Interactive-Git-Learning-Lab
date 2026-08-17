@@ -1,1 +1,7 @@
-repomix-output.xml,
+
+node_modules/
+dist/
+.DS_Store
+repomix-output.xml
+*.log
+.vscode/
