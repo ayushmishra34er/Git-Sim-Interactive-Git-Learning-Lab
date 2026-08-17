@@ -9,13 +9,8 @@ export function handleCommand(input) {
   const subcommand = parts[1]; // "init", "add", "commit", etc.
   const args = parts.slice(2); // remaining args
 
-  if (command !== "git") {
-    return `command not found: " ${command}`;
-  }
-
-  if (!subcommand) {
-    return "usage: git <command> [<args>]";
-  }
+  if (command !== "git") {return `command not found: " ${command}`; }
+  if (!subcommand) {return "usage: git <command> [<args>]";}
 
   switch (subcommand) {
     case "init": return handleInit();
@@ -23,9 +18,29 @@ export function handleCommand(input) {
     case "commit": return handleCommit(args.join(" "));
     case "status": return handleStatus();
     case "log": return handleLog();
+    case "push": return handlePush();
     default: return `git: '${subcommand}' is not a git command`;
   }
 }
+
+
+
+function handlePush() {
+    return new Promise((resolve, reject)=> {
+        if (!repo.initialized) {
+            reject("fatal: not a git repository");
+            return;
+}
+
+setTimeout(() => {
+    resolve(`To origin\n ${repo.HEAD} -> ${repo.HEAD}\nEverything up-to-date`);   
+}, 2000);
+
+    });
+
+}
+
+
 
 function handleInit(){
     if(repo.initialized) {
