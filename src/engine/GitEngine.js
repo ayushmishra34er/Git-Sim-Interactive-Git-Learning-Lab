@@ -6,7 +6,7 @@ export class GitEngine {
             initialized: false,
             commits: [],
             staged: [],
-            branches: { main: [] },
+            branches: { main: null },
             HEAD: "main"
         };
     }
@@ -27,6 +27,11 @@ export class GitEngine {
             case "status": return this.status();
             case "log": return this.log();
             case "push": return this.push();
+            case "branch": return this.branch(args);
+            case "checkout":
+            case "switch": return this.checkout(args);
+            case "merge": return this.merge(args);
+
             default: return `git: '${subcommand}' is not a git command`;
         }
     }
@@ -58,8 +63,10 @@ export class GitEngine {
         const messageMatch = input.match(/-m\s+"([^"]+)"/);
         const message = messageMatch ? messageMatch[1] : "no message";
 
-        const newCommit = new Commit(message);
+        const parentId = this.repo.branches[this.repo.HEAD]
+        const newCommit = new Commit(message, parentId);
         this.repo.commits.unshift(newCommit);
+        this.repo.branches[this.repo.HEAD] = newCommit.id;
         this.repo.staged = [];
 
         return `[${this.repo.HEAD} ${newCommit.id}] ${message}\n 1 file changed`;
@@ -77,11 +84,17 @@ export class GitEngine {
 
     log() {
         if (!this.repo.initialized) return "fatal: not a git repository";
-        if (this.repo.commits.length === 0) {
-            return `fatal: your current branch '${this.repo.HEAD}' does not have any commits yet`;
+
+        const tipId = this.repo.branches[this.repo.HEAD];
+        if (!tipId) {
+            return `fatal: your current branch '${this.repo.HEAD}' does not have any commits yet`
         }
+
+           const history = this.getHistory(tipId);
+
         let logOutput = "";
-        for (const c of this.repo.commits) {
+
+        for (const c of history) {
             logOutput += `commit ${c.id}\nDate: ${c.timestamp}\n\n    ${c.message}\n\n`;
         }
         return logOutput.trim();
@@ -97,5 +110,85 @@ export class GitEngine {
                 resolve(`To origin\n ${this.repo.HEAD} -> ${this.repo.HEAD}\nEverything up-to-date`);
             }, 2000);
         });
+    }
+
+// helpout
+
+
+    branch(args) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (args.length === 0) return "usage: git branch <name>";
+
+        const name = args[0];
+        if (Object.prototype.hasOwnProperty.call(this.repo.branches, name)) {
+            return `fatal: A branch named '${name}' already exists.`;
+        }
+
+        this.repo.branches[name] = this.repo.branches[this.repo.HEAD]; // new branch points at current tip
+        return "";
+    }
+
+    checkout(args) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (args.length === 0) return "usage: git checkout <branch>";
+
+        const name = args[0];
+        if (!Object.prototype.hasOwnProperty.call(this.repo.branches, name)) {
+            return `error: pathspec '${name}' did not match any file(s) known to git`;
+        }
+
+        this.repo.HEAD = name;
+        return `Switched to branch '${name}'`;
+    }
+
+    merge(args) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (args.length === 0) return "usage: git merge <branch>";
+
+        const targetName = args[0];
+        if (!Object.prototype.hasOwnProperty.call(this.repo.branches, targetName)) {
+            return `merge: ${targetName} - not something we can merge`;
+        }
+
+        const currentTip = this.repo.branches[this.repo.HEAD];
+        const targetTip = this.repo.branches[targetName];
+
+        if (targetTip === currentTip) {
+            return "Already up to date.";
+        }
+
+        // Fast-forward is possible if the current branch's tip is somewhere
+        // in the target branch's history (i.e. current has no unique commits)
+        const currentHistory = this.getHistory(currentTip);
+        const targetHistory = this.getHistory(targetTip);
+
+
+ if (targetTip !== null && currentHistory.some(c => c.id === targetTip)) {
+        return "Already up to date.";
+    }
+
+        const isFastForward = currentTip === null || targetHistory.some(c => c.id === currentTip);
+
+
+
+        if (isFastForward) {
+            this.repo.branches[this.repo.HEAD] = targetTip;
+            return `Updating ${currentTip ?? "0000000"}..${targetTip}\nFast-forward`;
+        }
+
+        return "Merge conflict simulation: both branches have diverged";
+    }
+
+    // Walks backward from a commit id through parentId links, returns tip-first array
+    getHistory(commitId) {
+        const history = [];
+        let currentId = commitId;
+        while (currentId) {
+            const commit = this.repo.commits.find(c => c.id === currentId);
+            if (!commit) break;
+            history.push(commit);
+            currentId = commit.parentId;
+        }
+        return history;
     }
 }

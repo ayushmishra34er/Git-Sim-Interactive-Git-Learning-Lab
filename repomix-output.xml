@@ -48,11 +48,11 @@ src/
   components/
     buildElement.js
   engine/
-    commandParser.js
+    GitEngine.js
   events/
     terminalEvents.js
-  state/
-    repo.js
+  models/
+    Commit.js
   utils/
     idGenerators.js
   app.js
@@ -116,6 +116,206 @@ export function buildElement(parentElement, tagName, text, options = {} ){
 // });
 </file>
 
+<file path="src/engine/GitEngine.js">
+import { Commit } from '../models/Commit.js';
+
+export class GitEngine {
+    constructor() {
+        this.repo = {
+            initialized: false,
+            commits: [],
+            staged: [],
+            branches: { main: [] },
+            HEAD: "main"
+        };
+    }
+
+    execute(input) {
+        const parts = input.trim().split(" ");
+        const command = parts[0];
+        const subcommand = parts[1];
+        const args = parts.slice(2);
+
+        if (command !== "git") return `command not found: ${command}`;
+        if (!subcommand) return "usage: git <command> [<args>]";
+
+        switch (subcommand) {
+            case "init": return this.init();
+            case "add": return this.add(args);
+            case "commit": return this.commit(args.join(" "));
+            case "status": return this.status();
+            case "log": return this.log();
+            case "push": return this.push();
+            case "branch": return this.branch(args);
+            case "checkout":
+            case "switch": return this.checkout(args);
+            case "merge": return this.merge(args);
+
+            default: return `git: '${subcommand}' is not a git command`;
+        }
+    }
+
+    init() {
+        if (this.repo.initialized) {
+            return "Reinitialized existing Git repository.";
+        }
+        this.repo.initialized = true;
+        return "Initialized empty Git repository in /project/.git/";
+    }
+
+    add(args) {
+        if (!this.repo.initialized) {
+            return "fatal: not a git repository (or any of the parent directories): .git";
+        }
+        if (args.length === 0) {
+            return "Nothing specified, nothing added.";
+        }
+        const fileToAdd = args[0] === "." ? "all_modified_files" : args.join(" ");
+        this.repo.staged.push(fileToAdd);
+        return "";
+    }
+
+    commit(input) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (this.repo.staged.length === 0) return "nothing to commit, working tree clean";
+
+        const messageMatch = input.match(/-m\s+"([^"]+)"/);
+        const message = messageMatch ? messageMatch[1] : "no message";
+
+        const parentId = this.repo.branches[this.repo.HEAD]
+        const newCommit = new Commit(message, parentId);
+        this.repo.commits.unshift(newCommit);
+        this.repo.branches[this.repo.HEAD] = newCommit.id;
+        this.repo.staged = [];
+
+        return `[${this.repo.HEAD} ${newCommit.id}] ${message}\n 1 file changed`;
+    }
+
+    status() {
+        if (!this.repo.initialized) {
+            return "fatal: not a git repository (or any of parent directories): .git";
+        }
+        if (this.repo.staged.length === 0) {
+            return `On branch ${this.repo.HEAD}\nnothing to commit, working tree clean`;
+        }
+        return `On branch ${this.repo.HEAD}\nChanges to be committed:\n  (use "git restore --staged <file>..." to unstage)\n\n\tnew file:   ${this.repo.staged.join(", ")}`;
+    }
+
+    log() {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+
+        const tipId = this.repo.branches[this.repo.HEAD];
+        if (!tipId) {
+            return `fatal: your current branch '${this.repo.HEAD}' does not have any commits yet`
+        }
+
+
+        let logOutput = "";
+
+        for (const c of history) {
+            logOutput += `commit ${c.id}\nDate: ${c.timestamp}\n\n    ${c.message}\n\n`;
+        }
+        return logOutput.trim();
+    }
+
+    push() {
+        return new Promise((resolve, reject) => {
+            if (!this.repo.initialized) {
+                reject("fatal: not a git repository");
+                return;
+            }
+            setTimeout(() => {
+                resolve(`To origin\n ${this.repo.HEAD} -> ${this.repo.HEAD}\nEverything up-to-date`);
+            }, 2000);
+        });
+    }
+
+// helpout
+
+
+    branch(args) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (args.length === 0) return "usage: git branch <name>";
+
+        const name = args[0];
+        if (Object.prototype.hasOwnProperty.call(this.repo.branches, name)) {
+            return `fatal: A branch named '${name}' already exists.`;
+        }
+
+        this.repo.branches[name] = this.repo.branches[this.repo.HEAD]; // new branch points at current tip
+        return "";
+    }
+
+    checkout(args) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (args.length === 0) return "usage: git checkout <branch>";
+
+        const name = args[0];
+        if (!Object.prototype.hasOwnProperty.call(this.repo.branches, name)) {
+            return `error: pathspec '${name}' did not match any file(s) known to git`;
+        }
+
+        this.repo.HEAD = name;
+        return `Switched to branch '${name}'`;
+    }
+
+    merge(args) {
+        if (!this.repo.initialized) return "fatal: not a git repository";
+        if (args.length === 0) return "usage: git merge <branch>";
+
+        const targetName = args[0];
+        if (!Object.prototype.hasOwnProperty.call(this.repo.branches, targetName)) {
+            return `merge: ${targetName} - not something we can merge`;
+        }
+
+        const currentTip = this.repo.branches[this.repo.HEAD];
+        const targetTip = this.repo.branches[targetName];
+
+        if (targetTip === currentTip) {
+            return "Already up to date.";
+        }
+
+        // Fast-forward is possible if the current branch's tip is somewhere
+        // in the target branch's history (i.e. current has no unique commits)
+        const targetHistory = this.getHistory(targetTip);
+        const isFastForward = currentTip === null || targetHistory.some(c => c.id === currentTip);
+
+        if (isFastForward) {
+            this.repo.branches[this.repo.HEAD] = targetTip;
+            return `Updating ${currentTip ?? "0000000"}..${targetTip}\nFast-forward`;
+        }
+
+        return "Merge conflict simulation: both branches have diverged";
+    }
+
+    // Walks backward from a commit id through parentId links, returns tip-first array
+    getHistory(commitId) {
+        const history = [];
+        let currentId = commitId;
+        while (currentId) {
+            const commit = this.repo.commits.find(c => c.id === currentId);
+            if (!commit) break;
+            history.push(commit);
+            currentId = commit.parentId;
+        }
+        return history;
+    }
+}
+</file>
+
+<file path="src/models/Commit.js">
+import { generateId } from '../utils/idGenerators.js';
+
+export class Commit {
+    constructor(message, parentId = null) {
+        this.id = generateId();
+        this.message = message;
+        this.parentId = parentId; // unused until v0.7, safe to add now
+        this.timestamp = new Date().toLocaleString();
+    }
+}
+</file>
+
 <file path="src/utils/idGenerators.js">
 export function generateId() {
     return "commit-" + Math.random().toString(36).substr(2, 5);
@@ -130,6 +330,38 @@ update it every time you tag a version, before you push. It's what lets you (or 
 understand what changed without reading every commit.
 
 ---
+
+
+## [v0.6] — Classes / OOP Refactor
+### Changed
+- Replaced standalone `handleCommand()` + loose handler functions (`handleInit`,
+  `handleAdd`, etc.) with a `GitEngine` class — all command logic now lives in one
+  class, dispatched through a single `execute()` method
+- Replaced plain `Commit` object literals with a real `Commit` class (`src/models/Commit.js`)
+- Removed `state/repo.js` — repo state now lives inside `GitEngine`'s constructor
+  instead of a separate module
+- Removed `engine/commandParser.js` — fully replaced by `GitEngine.js`
+- `app.js` now creates a single `GitEngine` instance and passes it into
+  `setupTerminalEvents(DOM, engine)`; `terminalEvents.js` calls `engine.execute()`
+  instead of importing a standalone function
+
+### Fixed (carried over from v0.5.5 debugging)
+- `handleCommit` was calling `.toLocalString()` (doesn't exist) instead of
+  `.toLocaleString()` — was silently crashing every `git commit`, so no commit
+  ever actually got added to state
+- `terminalEvents.js` had a leftover duplicate `handleCommand()` call that ran
+  before the push-specific `if/else` — caused every command to execute twice,
+  and rendered `[object Promise]` in the terminal specifically for `git push`
+
+### Added
+- `parentId` field on `Commit` (defaults to `null`) — unused for now, laid in
+  ahead of time so v0.7's branch/merge data model doesn't require migrating
+  existing commit shape
+
+### Why
+Data/behavior is unchanged from v0.5.5 — this is a structural refactor per the
+roadmap's v0.6 spec, not a new-feature version. Verified: init, add, commit,
+status, log, push all produce identical output to pre-refactor behavior.
 
 ## [v0.5.5] — In Progress
 ### Added
@@ -261,6 +493,43 @@ Commits will gain a `parentId` field (linked-list style, mirrors real git intern
 `branches` will change from arrays of commit ids to a simple pointer: `{ main: "commit-3" }`.
 This is necessary for the graph visualization to be able to walk commit history. Don't build
 new features on top of the current array-based `branches` shape — it's getting replaced.
+
+
+---
+git init
+git add .
+git commit -m "first commit"
+git branch feature
+git checkout feature
+git add .
+git commit -m "feature work"
+git log                      → should show 2 commits (feature branch's history)
+git checkout main
+git log                      → should show only 1 commit (main never moved)
+git merge feature
+git log                      → should now show 2 commits (fast-forwarded)
+git checkout main            (already on main, but test it doesn't break)
+git branch other
+git checkout other
+git add .
+git commit -m "other work"
+git checkout main
+git merge other               → should fast-forward again
+
+
+
+For a genuine divergence test:
+
+git branch a
+git branch b
+git checkout a
+git add . && git commit -m "a commit"
+git checkout b
+git add . && git commit -m "b commit"
+git checkout a
+git merge b     → should print "Merge conflict simulation: both branches have diverged"
+
+---
 </file>
 
 <file path="docs/ROADMAP.md">
@@ -503,18 +772,6 @@ This "linked list via parentId" model is literally how real git works internally
 Come back with your code (or just tell me which version, if something's stuck) and I'll review — same as before. If you get stuck mid-version on something confusing, don't grind for hours; come back with the specific error or behavior and we'll unblock it, then you keep going solo from there. That's the efficient way to use both your time and mine.
 </file>
 
-<file path="src/state/repo.js">
-//--- state ---
-
-export let repo = {
-  initialized: false,
-  commits: [],       // { id, message, timestamp }
-  staged: [],         // list of staged "file" names (fake — just strings for now)
-  branches: { main: [] }, // branch name -> array of commit ids (simplify however makes sense to you)
-  HEAD: "main"
-};
-</file>
-
 <file path="package.json">
 {
   "name": "git-sim",
@@ -543,69 +800,6 @@ export let repo = {
 }
 </file>
 
-<file path="src/events/terminalEvents.js">
-import { buildElement } from '../components/buildElement.js';
-import { handleCommand } from '../engine/commandParser.js';
-
-export function setupTerminalEvents(DOM) {
-    const newDiv = buildElement(DOM.terminalContent, 'div', '', { className: 'terminal-input-line' });
-    buildElement(newDiv, 'span', 'user@git-sim:~$ ', { className: 'prompt-text' });
-    const inputE1 = buildElement(newDiv, 'input', '', {
-        className: 'terminal-input',
-        attributes: { type: 'text', placeholder: 'type a git command here ... ', autocomplete: 'off' }
-    });
-
-    inputE1.addEventListener('keydown',async function (e) {
-        if (e.key === 'Enter') {
-            const userCommand = inputE1.value;
-
-            buildElement(DOM.terminalContent, 'p', `user@git-sim:~$ ${userCommand}`, {
-                className: 'terminal-output',
-                attributes: { style: 'color: #00ff00;' }
-            });
-
-            const systemResponse = handleCommand(userCommand);
-            if (systemResponse !== "") {
-                buildElement(DOM.terminalContent, 'p', systemResponse, {
-                    className: 'terminal-output',
-                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
-                });
-            }
-
-            inputE1.value = "";
-        
-        
-              if (userCommand.trim().startsWith("git push")) {
-            const loadingLine = buildElement(DOM.terminalContent, 'p', "Pushing to origin...", {
-                className: 'terminal-output',
-                attributes: { style: 'color: #ccc;' }
-            });
-
-            try {
-                const result = await handleCommand(userCommand);
-                loadingLine.textContent = result;
-            } catch (err) {
-                loadingLine.textContent = err;
-                loadingLine.style.color = "#ff5f56";
-            }
-        } else {
-            const systemResponse = await handleCommand(userCommand);
-            if (systemResponse !== "") {
-                buildElement(DOM.terminalContent, 'p', systemResponse, {
-                    className: 'terminal-output',
-                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
-                });
-            }
-        }
-
-        DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
-    
-        
-        }
-    });
-}
-</file>
-
 <file path=".gitignore">
 node_modules/
 dist/
@@ -613,97 +807,6 @@ dist/
 repomix-output.xml
 *.log
 .vscode/
-</file>
-
-<file path="README.md">
-# Git-Sim — Interactive Git Learning Lab
-
-A browser-based, JavaScript-simulated Git environment. Type real git commands into a
-terminal-style UI, watch a JS-powered engine parse and execute them against an in-memory
-fake repository, and see the resulting commit graph rendered live — with theory alongside
-so the "why," not just the "how," sticks.
-
-No real git is involved under the hood — this is a teaching simulation, not a wrapper
-around actual git. That's intentional: it means it's 100% safe to experiment in, and the
-whole engine is transparent, readable JavaScript rather than a black box.
-
-## Status: v0.5 (in progress — see known issues below)
-
-## Why this project exists
-
-Built as a learning-by-building exercise: rather than doing disconnected syntax exercises,
-every JS concept learned gets applied directly to extending this one app. See `docs/ROADMAP.md`
-for the full version-by-version plan and `docs/CHANGELOG.md` for what's actually shipped so far.
-
-## Features (current)
-
-- **Custom DOM engine** — a reusable `buildElement()` factory function used throughout instead
-  of hardcoded HTML, for real DOM-manipulation practice
-- **Command parser + state machine** — a JS object tracking repo state (init status, staged
-  files, commits, branches, HEAD), mutated by real command logic, not fake echoed text
-- **Modular architecture** — code is split by responsibility (`state/`, `engine/`, `events/`,
-  `components/`, `utils/`) using ES Modules
-
-## Supported commands (current)
-
-`git init` · `git add <file>` / `git add .` · `git commit -m "message"` · `git status` · `git log`
-
-See `docs/COMMANDS.md` for exact behavior specs, and what's planned next (`branch`, `checkout`,
-`merge`, and more).
-
-## Known issues (v0.5, pre-fix)
-
-The v0.4 → v0.5 modularization refactor is not yet fully wired — see the fix list below before
-this version is considered complete. Tracked in `docs/CHANGELOG.md` under `[v0.5]`.
-
-- Script tags in `index.html` need `type="module"`
-- `repo` needs to be exported from `state/repo.js`
-- Import path typo: `idGenerators.js` → `idGenerator.js`
-- `components/buildElement.js` needs to be created (currently only exists inline in old code)
-- `setupTerminalEvents()` needs to actually be called from `app.js`
-- `terminalEvents.js` needs its own local `inputE1`/output element references
-
-## How to run locally
-
-This project uses ES Modules (`import`/`export`), which browsers block over `file://` due to
-CORS. You need to serve it via a local server:
-
-**Option 1 — VS Code:** install the "Live Server" extension, right-click `index.html` → "Open with Live Server"
-
-**Option 2 — Python:**
-
-```bash
-python3 -m http.server
-```
-
-then visit `http://localhost:8000`
-
-## Project structure
-
-```
-src/
-├── app.js              entry point — wires everything together
-├── state/               repo state object
-├── engine/               command parser + git command logic
-├── components/           DOM-building helpers (buildElement)
-├── events/               terminal input event handling
-└── utils/                small helpers (id generation, etc.)
-docs/
-├── ROADMAP.md            full version-by-version build plan
-├── CHANGELOG.md          what shipped in each version
-└── COMMANDS.md           spec for each simulated git command
-```
-
-## Roadmap
-
-Full plan through v1.0 (and beyond) lives in `docs/ROADMAP.md`. Short version: DOM → events →
-real state → modular architecture → OOP → branching/merging + graph visualization → async →
-persistence → v1.0 ship.
-
-## License
-
-Not yet decided — add one before making the repo public-facing as a portfolio piece (MIT is a
-common, permissive default for this kind of project).
 </file>
 
 <file path="style.css">
@@ -917,128 +1020,151 @@ main {
 }
 </file>
 
-<file path="src/engine/commandParser.js">
-import { repo } from "../state/repo.js";
-import { generateId } from "../utils/idGenerators.js";
+<file path="README.md">
+# Git-Sim — Interactive Git Learning Lab
+
+A browser-based, JavaScript-simulated Git environment. Type real git commands into a
+terminal-style UI, watch a JS-powered engine parse and execute them against an in-memory
+fake repository, and see the resulting commit graph rendered live — with theory alongside
+so the "why," not just the "how," sticks.
+
+No real git is involved under the hood — this is a teaching simulation, not a wrapper
+around actual git. That's intentional: it means it's 100% safe to experiment in, and the
+whole engine is transparent, readable JavaScript rather than a black box.
+
+## Status: v0.5 (in progress — see known issues below)
+
+## Why this project exists
+
+Built as a learning-by-building exercise: rather than doing disconnected syntax exercises,
+every JS concept learned gets applied directly to extending this one app. See `docs/ROADMAP.md`
+for the full version-by-version plan and `docs/CHANGELOG.md` for what's actually shipped so far.
+
+## Features (current)
+
+- **Custom DOM engine** — a reusable `buildElement()` factory function used throughout instead
+  of hardcoded HTML, for real DOM-manipulation practice
+- **Command parser + state machine** — a JS object tracking repo state (init status, staged
+  files, commits, branches, HEAD), mutated by real command logic, not fake echoed text
+- **Modular architecture** — code is split by responsibility (`state/`, `engine/`, `events/`,
+  `components/`, `utils/`) using ES Modules
+
+## Supported commands (current)
+
+`git init` · `git add <file>` / `git add .` · `git commit -m "message"` · `git status` · `git log`
+
+See `docs/COMMANDS.md` for exact behavior specs, and what's planned next (`branch`, `checkout`,
+`merge`, and more).
+
+## Known issues (v0.5, pre-fix)
+
+The v0.4 → v0.5 modularization refactor is not yet fully wired — see the fix list below before
+this version is considered complete. Tracked in `docs/CHANGELOG.md` under `[v0.5]`.
+
+- Script tags in `index.html` need `type="module"`
+- `repo` needs to be exported from `state/repo.js`
+- Import path typo: `idGenerators.js` → `idGenerator.js`
+- `components/buildElement.js` needs to be created (currently only exists inline in old code)
+- `setupTerminalEvents()` needs to actually be called from `app.js`
+- `terminalEvents.js` needs its own local `inputE1`/output element references
+
+## How to run locally
+
+This project uses ES Modules (`import`/`export`), which browsers block over `file://` due to
+CORS. You need to serve it via a local server:
+
+**Option 1 — VS Code:** install the "Live Server" extension, right-click `index.html` → "Open with Live Server"
+
+**Option 2 — Python:**
+
+```bash
+python3 -m http.server
+```
+
+then visit `http://localhost:8000`
+
+## Project structure
+
+```
+src/
+├── app.js              entry point — wires everything together
+├── state/               repo state object
+├── engine/               command parser + git command logic
+├── components/           DOM-building helpers (buildElement)
+├── events/               terminal input event handling
+└── utils/                small helpers (id generation, etc.)
+docs/
+├── ROADMAP.md            full version-by-version build plan
+├── CHANGELOG.md          what shipped in each version
+└── COMMANDS.md           spec for each simulated git command
+```
+
+## Roadmap
+
+Full plan through v1.0 (and beyond) lives in `docs/ROADMAP.md`. Short version: DOM → events →
+real state → modular architecture → OOP → branching/merging + graph visualization → async →
+persistence → v1.0 ship.
+
+## License
+
+Not yet decided — add one before making the repo public-facing as a portfolio piece (MIT is a
+common, permissive default for this kind of project).
+</file>
+
+<file path="src/events/terminalEvents.js">
+import { buildElement } from '../components/buildElement.js';
 
 
-
-export function handleCommand(input) {
-  const parts = input.trim().split(" ");
-  const command = parts[0]; // "git"
-  const subcommand = parts[1]; // "init", "add", "commit", etc.
-  const args = parts.slice(2); // remaining args
-
-  if (command !== "git") {return `command not found: " ${command}`; }
-  if (!subcommand) {return "usage: git <command> [<args>]";}
-
-  switch (subcommand) {
-    case "init": return handleInit();
-    case "add": return handleAdd(args);
-    case "commit": return handleCommit(args.join(" "));
-    case "status": return handleStatus();
-    case "log": return handleLog();
-    case "push": return handlePush();
-    default: return `git: '${subcommand}' is not a git command`;
-  }
-}
-
-
-
-function handlePush() {
-    return new Promise((resolve, reject)=> {
-        if (!repo.initialized) {
-            reject("fatal: not a git repository");
-            return;
-}
-
-setTimeout(() => {
-    resolve(`To origin\n ${repo.HEAD} -> ${repo.HEAD}\nEverything up-to-date`);   
-}, 2000);
-
+export function setupTerminalEvents(DOM, engine) {
+    const newDiv = buildElement(DOM.terminalContent, 'div', '', { className: 'terminal-input-line' });
+    buildElement(newDiv, 'span', 'user@git-sim:~$ ', { className: 'prompt-text' });
+    const inputE1 = buildElement(newDiv, 'input', '', {
+        className: 'terminal-input',
+        attributes: { type: 'text', placeholder: 'type a git command here ... ', autocomplete: 'off' }
     });
 
-}
+    inputE1.addEventListener('keydown',async function (e) {
+        if (e.key === 'Enter') {
+            const userCommand = inputE1.value;
 
+            buildElement(DOM.terminalContent, 'p', `user@git-sim:~$ ${userCommand}`, {
+                className: 'terminal-output',
+                attributes: { style: 'color: #00ff00;' }
+            });
 
+           
 
-function handleInit(){
-    if(repo.initialized) {
-        return "Reinitialized existing Git repository.";
+            inputE1.value = "";
+        
+        
+              if (userCommand.trim().startsWith("git push")) {
+            const loadingLine = buildElement(DOM.terminalContent, 'p', "Pushing to origin...", {
+                className: 'terminal-output',
+                attributes: { style: 'color: #ccc;' }
+            });
 
-    }
-
-    repo.initialized = true;
-    return "Initialized empty Git repository in /project/.git/"
-};
-
-function handleStatus() {
-    if(!repo.initialized){
-        return "fatal: not a git repository (or any of parent directories): .git"
-    }
-
-    if(repo.staged.length === 0){
-        return `On branch ${repo.HEAD}\nnothing to commit, working tree clean`;
-    } else {
-        return `On branch ${repo.HEAD}\nChanges to be committed:\n  (use "git restore --staged <file>..." to unstage)\n\n\tnew file:   ${repo.staged.join(", ")}`;
-    }
-};
-
-function handleAdd(args) {
-    if(!repo.initialized ){
-        return "fatal: not a git repository (or any of the parent directories): .git";
-    }
-
-    if(args.length === 0){
-            return "Nothing specified, nothing added.";
-       
+            try {
+                const result = await engine.execute(userCommand);
+                loadingLine.textContent = result;
+            } catch (err) {
+                loadingLine.textContent = err;
+                loadingLine.style.color = "#ff5f56";
+            }
+        } else {
+            const systemResponse = await engine.execute(userCommand);
+            if (systemResponse !== "") {
+                buildElement(DOM.terminalContent, 'p', systemResponse, {
+                    className: 'terminal-output',
+                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
+                });
+            }
         }
 
-        const fileToAdd = args[0] === "." ? "all_modified_files" : args.join(" ");
-
-        repo.staged.push(fileToAdd);
-
-        return "";
-
-}
-
-function handleCommit(input) {
-    if (!repo.initialized) return "fatal: not a git repository";
-    if (repo.staged.length === 0) return "nothing to commit, working tree clean";
-
-    const messageMatch = input.match(/-m\s+"([^"]+)"/);
-    const message = messageMatch ? messageMatch[1] : "no message";
+        DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
     
-
-    const commitId = generateId();
-    
-    
-
-    const newCommit = {
-        id: commitId, 
-        message: message,
-        timestamp: new Date().toLocalString()
-    };
-    repo.commits.unshift(newCommit);
-    repo.staged = [];
-
-    return `[${repo.HEAD} ${commitId}] ${message}\n 1 file changed`;
-
-};
-
-function handleLog() {
-    if (!repo.initialized) return "fatal: not a git repository";
-    if (repo.commits.length === 0) return `fatal: your current branch '${repo.HEAD}' does not have any commits yet`;
-
-    let logOutput = "";
-    
-    // Loop through our commits and format them like real Git
-    for (let i = 0; i < repo.commits.length; i++) {
-        const c = repo.commits[i];
-        logOutput += `commit ${c.id}\nDate: ${c.timestamp}\n\n    ${c.message}\n\n`;
-    }
-    
-    return logOutput.trim();
+        
+        }
+    });
 }
 </file>
 
@@ -1125,6 +1251,7 @@ function handleLog() {
 <file path="src/app.js">
 import { buildElement } from './components/buildElement.js';
 import { setupTerminalEvents } from './events/terminalEvents.js';
+import { GitEngine } from './engine/GitEngine.js';
 
 //selectors
 const DOM = {
@@ -1132,7 +1259,9 @@ const DOM = {
     theoryContent: document.querySelector('.theory-content'),
 
 
-}
+};
+
+const engine = new GitEngine();
 
  
 buildElement(DOM.theoryContent, 'h1', 'Understanding Git Status', {
@@ -1152,7 +1281,8 @@ const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
 
 
 
-setupTerminalEvents(DOM);
+
+setupTerminalEvents(DOM, engine);
 </file>
 
 </files>

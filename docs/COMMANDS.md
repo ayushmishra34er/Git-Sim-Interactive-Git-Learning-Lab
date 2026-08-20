@@ -17,6 +17,7 @@ Update this file whenever you add or change a command's behavior.
 | `git commit -m "msg"` | `repo.initialized`, `repo.staged.length > 0` | creates commit object, unshifts into `repo.commits`, clears `repo.staged` | `"[<branch> <id>] <message>\n 1 file changed"` |
 | `git status` | `repo.initialized` | none (read-only) | branch name + staged files, or "nothing to commit, working tree clean" |
 | `git log` | `repo.initialized`, `repo.commits.length > 0` | none (read-only) | formatted list of all commits, most recent first |
+`git branch <name>`|  `git checkout <name>` / `git switch <name>`
 
 ---
 
@@ -24,7 +25,7 @@ Update this file whenever you add or change a command's behavior.
 
 | Command | Preconditions checked | State mutated | Output |
 |---|---|---|---|
-| `git push` | `repo.initialized` | none yet (simulated — no real remote state tracked) | Async: shows `"Pushing to origin..."` then, after ~2s delay, a success message |
+| `git push` | `repo.initialized` | none yet (simulated — no real remote state tracked) | Async: shows `"Pushing to origin..."` then, after ~2s delay, a success message | `git merge <name>` | both branches must exist | fast-forward: current branch pointer moves to match target; diverged: no mutation | success message, or `"Merge conflict simulation: both branches have diverged"`|
 
 ---
 
@@ -32,9 +33,9 @@ Update this file whenever you add or change a command's behavior.
 
 | Command | Preconditions checked | State mutated | Output |
 |---|---|---|---|
-| `git branch <name>` | `repo.initialized`, name doesn't already exist | adds new entry to `repo.branches` pointing at current HEAD's commit | confirmation, or error if branch exists |
-| `git checkout <name>` / `git switch <name>` | branch must exist | `repo.HEAD = <name>` | `"Switched to branch '<name>'"` or error |
-| `git merge <name>` | both branches must exist | fast-forward: current branch pointer moves to match target; diverged: no mutation | success message, or `"Merge conflict simulation: both branches have diverged"` |
+|  | `repo.initialized`, name doesn't already exist | adds new entry to `repo.branches` pointing at current HEAD's commit | confirmation, or error if branch exists |
+| | branch must exist | `repo.HEAD = <name>` | `"Switched to branch '<name>'"` or error |
+
 
 ---
 
@@ -62,3 +63,40 @@ Commits will gain a `parentId` field (linked-list style, mirrors real git intern
 `branches` will change from arrays of commit ids to a simple pointer: `{ main: "commit-3" }`.
 This is necessary for the graph visualization to be able to walk commit history. Don't build
 new features on top of the current array-based `branches` shape — it's getting replaced.
+
+
+---
+git init
+git add .
+git commit -m "first commit"
+git branch feature
+git checkout feature
+git add .
+git commit -m "feature work"
+git log                      → should show 2 commits (feature branch's history)
+git checkout main
+git log                      → should show only 1 commit (main never moved)
+git merge feature
+git log                      → should now show 2 commits (fast-forwarded)
+git checkout main            (already on main, but test it doesn't break)
+git branch other
+git checkout other
+git add .
+git commit -m "other work"
+git checkout main
+git merge other               → should fast-forward again
+
+
+
+For a genuine divergence test:
+
+git branch a
+git branch b
+git checkout a
+git add . && git commit -m "a commit"
+git checkout b
+git add . && git commit -m "b commit"
+git checkout a
+git merge b     → should print "Merge conflict simulation: both branches have diverged"
+
+---
