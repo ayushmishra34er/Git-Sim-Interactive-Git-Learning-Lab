@@ -62,3 +62,40 @@ Commits will gain a `parentId` field (linked-list style, mirrors real git intern
 `branches` will change from arrays of commit ids to a simple pointer: `{ main: "commit-3" }`.
 This is necessary for the graph visualization to be able to walk commit history. Don't build
 new features on top of the current array-based `branches` shape — it's getting replaced.
+
+
+---
+git init
+git add .
+git commit -m "first commit"
+git branch feature
+git checkout feature
+git add .
+git commit -m "feature work"
+git log                      → should show 2 commits (feature branch's history)
+git checkout main
+git log                      → should show only 1 commit (main never moved)
+git merge feature
+git log                      → should now show 2 commits (fast-forwarded)
+git checkout main            (already on main, but test it doesn't break)
+git branch other
+git checkout other
+git add .
+git commit -m "other work"
+git checkout main
+git merge other               → should fast-forward again
+
+
+
+For a genuine divergence test:
+
+git branch a
+git branch b
+git checkout a
+git add . && git commit -m "a commit"
+git checkout b
+git add . && git commit -m "b commit"
+git checkout a
+git merge b     → should print "Merge conflict simulation: both branches have diverged"
+
+---
