@@ -86,3 +86,5 @@ persistence → v1.0 ship.
 
 Not yet decided — add one before making the repo public-facing as a portfolio piece (MIT is a
 common, permissive default for this kind of project).
+
+

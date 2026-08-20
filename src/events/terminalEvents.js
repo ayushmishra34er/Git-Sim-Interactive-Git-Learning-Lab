@@ -18,13 +18,7 @@ export function setupTerminalEvents(DOM) {
                 attributes: { style: 'color: #00ff00;' }
             });
 
-            const systemResponse = handleCommand(userCommand);
-            if (systemResponse !== "") {
-                buildElement(DOM.terminalContent, 'p', systemResponse, {
-                    className: 'terminal-output',
-                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
-                });
-            }
+           
 
             inputE1.value = "";
         
