@@ -1,6 +1,7 @@
 
 import { buildElement } from './components/buildElement.js';
 import { setupTerminalEvents } from './events/terminalEvents.js';
+import { GitEngine } from './engine/GitEngine.js';
 
 //selectors
 const DOM = {
@@ -8,7 +9,9 @@ const DOM = {
     theoryContent: document.querySelector('.theory-content'),
 
 
-}
+};
+
+const engine = new GitEngine();
 
  
 buildElement(DOM.theoryContent, 'h1', 'Understanding Git Status', {
@@ -28,4 +31,5 @@ const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
 
 
 
-setupTerminalEvents(DOM);
+
+setupTerminalEvents(DOM, engine);

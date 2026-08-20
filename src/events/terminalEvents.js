@@ -1,7 +1,7 @@
 import { buildElement } from '../components/buildElement.js';
-import { handleCommand } from '../engine/commandParser.js';
 
-export function setupTerminalEvents(DOM) {
+
+export function setupTerminalEvents(DOM, engine) {
     const newDiv = buildElement(DOM.terminalContent, 'div', '', { className: 'terminal-input-line' });
     buildElement(newDiv, 'span', 'user@git-sim:~$ ', { className: 'prompt-text' });
     const inputE1 = buildElement(newDiv, 'input', '', {
@@ -30,14 +30,14 @@ export function setupTerminalEvents(DOM) {
             });
 
             try {
-                const result = await handleCommand(userCommand);
+                const result = await engine.execute(userCommand);
                 loadingLine.textContent = result;
             } catch (err) {
                 loadingLine.textContent = err;
                 loadingLine.style.color = "#ff5f56";
             }
         } else {
-            const systemResponse = await handleCommand(userCommand);
+            const systemResponse = await engine.execute(userCommand);
             if (systemResponse !== "") {
                 buildElement(DOM.terminalContent, 'p', systemResponse, {
                     className: 'terminal-output',
