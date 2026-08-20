@@ -97,8 +97,11 @@ function handleCommit(input) {
     const newCommit = {
         id: commitId, 
         message: message,
-        timestamp: new Date().toLocalString()
+        timestamp: new Date().toLocaleString()
     };
+
+    // bug fix: ive typed .toLocalString()
+    
     repo.commits.unshift(newCommit);
     repo.staged = [];
 

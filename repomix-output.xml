@@ -503,6 +503,46 @@ This "linked list via parentId" model is literally how real git works internally
 Come back with your code (or just tell me which version, if something's stuck) and I'll review — same as before. If you get stuck mid-version on something confusing, don't grind for hours; come back with the specific error or behavior and we'll unblock it, then you keep going solo from there. That's the efficient way to use both your time and mine.
 </file>
 
+<file path="src/state/repo.js">
+//--- state ---
+
+export let repo = {
+  initialized: false,
+  commits: [],       // { id, message, timestamp }
+  staged: [],         // list of staged "file" names (fake — just strings for now)
+  branches: { main: [] }, // branch name -> array of commit ids (simplify however makes sense to you)
+  HEAD: "main"
+};
+</file>
+
+<file path="package.json">
+{
+  "name": "git-sim",
+  "version": "1.0.0",
+  "description": "A browser-based, JavaScript-simulated Git environment. Type real git commands into a terminal-style UI, watch a JS-powered engine parse and execute them against an in-memory fake repository, and see the resulting commit graph rendered live — with theory alongside so the \"why,\" not just the \"how,\" sticks.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab/issues"
+  },
+  "homepage": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab#readme"
+}
+</file>
+
 <file path="src/events/terminalEvents.js">
 import { buildElement } from '../components/buildElement.js';
 import { handleCommand } from '../engine/commandParser.js';
@@ -515,7 +555,7 @@ export function setupTerminalEvents(DOM) {
         attributes: { type: 'text', placeholder: 'type a git command here ... ', autocomplete: 'off' }
     });
 
-    inputE1.addEventListener('keydown', function (e) {
+    inputE1.addEventListener('keydown',async function (e) {
         if (e.key === 'Enter') {
             const userCommand = inputE1.value;
 
@@ -533,140 +573,46 @@ export function setupTerminalEvents(DOM) {
             }
 
             inputE1.value = "";
-            DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
+        
+        
+              if (userCommand.trim().startsWith("git push")) {
+            const loadingLine = buildElement(DOM.terminalContent, 'p', "Pushing to origin...", {
+                className: 'terminal-output',
+                attributes: { style: 'color: #ccc;' }
+            });
+
+            try {
+                const result = await handleCommand(userCommand);
+                loadingLine.textContent = result;
+            } catch (err) {
+                loadingLine.textContent = err;
+                loadingLine.style.color = "#ff5f56";
+            }
+        } else {
+            const systemResponse = await handleCommand(userCommand);
+            if (systemResponse !== "") {
+                buildElement(DOM.terminalContent, 'p', systemResponse, {
+                    className: 'terminal-output',
+                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
+                });
+            }
+        }
+
+        DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
+    
+        
         }
     });
 }
 </file>
 
-<file path="src/state/repo.js">
-//--- state ---
-
-export let repo = {
-  initialized: false,
-  commits: [],       // { id, message, timestamp }
-  staged: [],         // list of staged "file" names (fake — just strings for now)
-  branches: { main: [] }, // branch name -> array of commit ids (simplify however makes sense to you)
-  HEAD: "main"
-};
-</file>
-
 <file path=".gitignore">
-repomix-output.xml,
-</file>
-
-<file path="package.json">
-
-</file>
-
-<file path="src/engine/commandParser.js">
-import { repo } from "../state/repo.js";
-import { generateId } from "../utils/idGenerators.js";
-
-
-
-export function handleCommand(input) {
-  const parts = input.trim().split(" ");
-  const command = parts[0]; // "git"
-  const subcommand = parts[1]; // "init", "add", "commit", etc.
-  const args = parts.slice(2); // remaining args
-
-  if (command !== "git") {
-    return `command not found: " ${command}`;
-  }
-
-  if (!subcommand) {
-    return "usage: git <command> [<args>]";
-  }
-
-  switch (subcommand) {
-    case "init": return handleInit();
-    case "add": return handleAdd(args);
-    case "commit": return handleCommit(args);
-    case "status": return handleStatus();
-    case "log": return handleLog();
-    default: return `git: '${subcommand}' is not a git command`;
-  }
-}
-
-function handleInit(){
-    if(repo.initialized) {
-        return "Reinitialized existing Git repository.";
-
-    }
-
-    repo.initialized = true;
-    return "Initialized empty Git repository in /project/.git/"
-};
-
-function handleStatus() {
-    if(!repo.initialized){
-        return "fatal: not a git repository (or any of parent directories): .git"
-    }
-
-    if(repo.staged.length === 0){
-        return `On branch ${repo.HEAD}\nnothing to commit, working tree clean`;
-    } else {
-        return `On branch ${repo.HEAD}\nChanges to be committed:\n  (use "git restore --staged <file>..." to unstage)\n\n\tnew file:   ${repo.staged.join(", ")}`;
-    }
-};
-
-function handleAdd(args) {
-    if(!repo.initialized ){
-        return "fatal: not a git repository (or any of the parent directories): .git";
-    }
-
-    if(args.length === 0){
-            return "Nothing specified, nothing added.";
-       
-        }
-
-        const fileToAdd = args[0] === "." ? "all_modified_files" : args.join(" ");
-
-        repo.staged.push(fileToAdd);
-
-        return "";
-
-}
-
-function handleCommit(input) {
-    if (!repo.initialized) return "fatal: not a git repository";
-    if (repo.staged.length === 0) return "nothing to commit, working tree clean";
-
-    const messageMatch = input.match(/-m\s+"([^"]+)"/);
-    const message = messageMatch ? messageMatch[1] : "no message";
-    
-
-    const commitId = generateId();
-    
-    
-
-    const newCommit = {
-        id: commitId, 
-        message: message,
-        timestamp: new Date().toLocalString()
-    };
-    repo.commits.unshift(newCommit);
-    repo.staged = [];
-
-    return `[${repo.HEAD} ${commitId}] ${message}\n 1 file changed`;
-
-};
-
-function handleLog() {
-    if (!repo.initialized) return "fatal: not a git repository";
-    if (repo.commits.length === 0) return `fatal: your current branch '${repo.HEAD}' does not have any commits yet`;
-
-    let logOutput = "";
-    
-    // Loop through our commits and format them like real Git
-    for (let i = 0; i < repo.commits.length; i++) {
-        const c = repo.commits[i];
-        logOutput += `commit ${c.id}\nDate: ${c.timestamp}\n\n    ${c.message}\n\n`;
-    }
-    
-    return logOutput.trim();
-}
+node_modules/
+dist/
+.DS_Store
+repomix-output.xml
+*.log
+.vscode/
 </file>
 
 <file path="README.md">
@@ -968,6 +914,131 @@ main {
     color: #171717;
     border-bottom: 2px solid #e5e5e5;
     padding-bottom: 10px;
+}
+</file>
+
+<file path="src/engine/commandParser.js">
+import { repo } from "../state/repo.js";
+import { generateId } from "../utils/idGenerators.js";
+
+
+
+export function handleCommand(input) {
+  const parts = input.trim().split(" ");
+  const command = parts[0]; // "git"
+  const subcommand = parts[1]; // "init", "add", "commit", etc.
+  const args = parts.slice(2); // remaining args
+
+  if (command !== "git") {return `command not found: " ${command}`; }
+  if (!subcommand) {return "usage: git <command> [<args>]";}
+
+  switch (subcommand) {
+    case "init": return handleInit();
+    case "add": return handleAdd(args);
+    case "commit": return handleCommit(args.join(" "));
+    case "status": return handleStatus();
+    case "log": return handleLog();
+    case "push": return handlePush();
+    default: return `git: '${subcommand}' is not a git command`;
+  }
+}
+
+
+
+function handlePush() {
+    return new Promise((resolve, reject)=> {
+        if (!repo.initialized) {
+            reject("fatal: not a git repository");
+            return;
+}
+
+setTimeout(() => {
+    resolve(`To origin\n ${repo.HEAD} -> ${repo.HEAD}\nEverything up-to-date`);   
+}, 2000);
+
+    });
+
+}
+
+
+
+function handleInit(){
+    if(repo.initialized) {
+        return "Reinitialized existing Git repository.";
+
+    }
+
+    repo.initialized = true;
+    return "Initialized empty Git repository in /project/.git/"
+};
+
+function handleStatus() {
+    if(!repo.initialized){
+        return "fatal: not a git repository (or any of parent directories): .git"
+    }
+
+    if(repo.staged.length === 0){
+        return `On branch ${repo.HEAD}\nnothing to commit, working tree clean`;
+    } else {
+        return `On branch ${repo.HEAD}\nChanges to be committed:\n  (use "git restore --staged <file>..." to unstage)\n\n\tnew file:   ${repo.staged.join(", ")}`;
+    }
+};
+
+function handleAdd(args) {
+    if(!repo.initialized ){
+        return "fatal: not a git repository (or any of the parent directories): .git";
+    }
+
+    if(args.length === 0){
+            return "Nothing specified, nothing added.";
+       
+        }
+
+        const fileToAdd = args[0] === "." ? "all_modified_files" : args.join(" ");
+
+        repo.staged.push(fileToAdd);
+
+        return "";
+
+}
+
+function handleCommit(input) {
+    if (!repo.initialized) return "fatal: not a git repository";
+    if (repo.staged.length === 0) return "nothing to commit, working tree clean";
+
+    const messageMatch = input.match(/-m\s+"([^"]+)"/);
+    const message = messageMatch ? messageMatch[1] : "no message";
+    
+
+    const commitId = generateId();
+    
+    
+
+    const newCommit = {
+        id: commitId, 
+        message: message,
+        timestamp: new Date().toLocalString()
+    };
+    repo.commits.unshift(newCommit);
+    repo.staged = [];
+
+    return `[${repo.HEAD} ${commitId}] ${message}\n 1 file changed`;
+
+};
+
+function handleLog() {
+    if (!repo.initialized) return "fatal: not a git repository";
+    if (repo.commits.length === 0) return `fatal: your current branch '${repo.HEAD}' does not have any commits yet`;
+
+    let logOutput = "";
+    
+    // Loop through our commits and format them like real Git
+    for (let i = 0; i < repo.commits.length; i++) {
+        const c = repo.commits[i];
+        logOutput += `commit ${c.id}\nDate: ${c.timestamp}\n\n    ${c.message}\n\n`;
+    }
+    
+    return logOutput.trim();
 }
 </file>
 
