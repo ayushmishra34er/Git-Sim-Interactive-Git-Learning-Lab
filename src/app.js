@@ -2,11 +2,14 @@
 import { buildElement } from './components/buildElement.js';
 import { setupTerminalEvents } from './events/terminalEvents.js';
 import { GitEngine } from './engine/GitEngine.js';
+import {renderGraph} from './components/graphRenderer.js';
+
 
 //selectors
 const DOM = {
     terminalContent: document.querySelector('.terminal-content'),
     theoryContent: document.querySelector('.theory-content'),
+    graphContainer: document.querySelector('.visual-panel'),
 
 
 };
@@ -32,4 +35,5 @@ const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
 
 
 
+renderGraph(engine.repo, DOM.graphContainer);
 setupTerminalEvents(DOM, engine);

@@ -1,4 +1,5 @@
 import { buildElement } from '../components/buildElement.js';
+import { renderGraph } from '../components/graphRenderer.js';
 
 
 export function setupTerminalEvents(DOM, engine) {
@@ -45,7 +46,8 @@ export function setupTerminalEvents(DOM, engine) {
                 });
             }
         }
-
+        
+        renderGraph(engine.repo, DOM.graphContainer);
         DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
     
         
