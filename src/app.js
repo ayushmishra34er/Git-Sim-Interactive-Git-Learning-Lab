@@ -12,25 +12,20 @@ const DOM = {
     graphContainer: document.querySelector('.visual-panel'),
 
 
-};
+};const engine = new GitEngine();
+engine.load();
 
-const engine = new GitEngine();
+export function renderTheoryPanel() {
+    DOM.theoryContent.innerHTML = "";
+    const chapter = engine.getCurrentChapter();
+    if (!chapter) return;
+    buildElement(DOM.theoryContent, 'h1', chapter.title, { className: 'currentChapterHeader' });
+    buildElement(DOM.theoryContent, 'p', chapter.text, { className: 'terminal-output-text' });
+}
 
- 
-buildElement(DOM.theoryContent, 'h1', 'Understanding Git Status', {
-    className: 'currentChapterHeader',
-});
-
-
-buildElement(DOM.theoryContent, 'p', 'When you type a command in the terminal on the left, this panel will explain the underlying theory, while the center panel maps out the commits visually.',
-     {
-    className: 'terminal-output-text',
-});
-
-const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
-    className: 'userClickedOutput',
-})
-
+renderTheoryPanel();
+renderGraph(engine.repo, DOM.graphContainer);
+setupTerminalEvents(DOM, engine);
 
 
 

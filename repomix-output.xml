@@ -48,6 +48,8 @@ src/
   components/
     buildElement.js
     graphRenderer.js
+  content/
+    chapters.js
   engine/
     GitEngine.js
   events/
@@ -67,122 +69,39 @@ style.css
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/graphRenderer.js">
-export function renderGraph(repo, container) {
-    
-  container.innerHTML = "";
- 
-    if (!repo.initialized || repo.commits.length === 0) {
-        const msg = document.createElement("div");
-        msg.className = "placeholder-text";
-        msg.textContent = repo.initialized
-            ? "[ No commits yet ]"
-            : "[ Run 'git init' to get started ]";
-        container.appendChild(msg);
-        return;
-    }
- 
-    // repo.commits is stored newest-first (unshift), reverse to draw oldest -> newest left to right
-    const commits = [...repo.commits].reverse();
- 
-    const spacingX = 100;
-    const startX = 60;
-    const rowY = 150;
-    const radius = 20;
- 
-    // simple layout: everyone on one horizontal line, in creation order
-    const positions = {};
-    commits.forEach((c, i) => {
-        positions[c.id] = { x: startX + i * spacingX, y: rowY };
-    });
- 
-    const width = Math.max(400, startX + commits.length * spacingX + 60);
-    const height = 300;
- 
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
- 
-    // edges first, so they sit behind the commit circles
-    commits.forEach((c) => {
-        if (c.parentId && positions[c.parentId]) {
-            const from = positions[c.parentId];
-            const to = positions[c.id];
-            const line = document.createElementNS(svgNS, "line");
-            line.setAttribute("x1", from.x);
-            line.setAttribute("y1", from.y);
-            line.setAttribute("x2", to.x);
-            line.setAttribute("y2", to.y);
-            line.setAttribute("stroke", "#adb5bd");
-            line.setAttribute("stroke-width", "2");
-            svg.appendChild(line);
-        }
-    });
- 
-    // commit nodes + labels
-    commits.forEach((c) => {
-        const pos = positions[c.id];
- 
-        const circle = document.createElementNS(svgNS, "circle");
-        circle.setAttribute("cx", pos.x);
-        circle.setAttribute("cy", pos.y);
-        circle.setAttribute("r", radius);
-        circle.setAttribute("fill", "#4ade80");
-        circle.setAttribute("stroke", "#171717");
-        circle.setAttribute("stroke-width", "2");
-        svg.appendChild(circle);
- 
-        const idLabel = document.createElementNS(svgNS, "text");
-        idLabel.setAttribute("x", pos.x);
-        idLabel.setAttribute("y", pos.y + radius + 16);
-        idLabel.setAttribute("text-anchor", "middle");
-        idLabel.setAttribute("font-size", "11");
-        idLabel.setAttribute("fill", "#333");
-        idLabel.textContent = c.id;
-        svg.appendChild(idLabel);
- 
-        const msgLabel = document.createElementNS(svgNS, "text");
-        msgLabel.setAttribute("x", pos.x);
-        msgLabel.setAttribute("y", pos.y + radius + 32);
-        msgLabel.setAttribute("text-anchor", "middle");
-        msgLabel.setAttribute("font-size", "10");
-        msgLabel.setAttribute("fill", "#666");
-        const shortMsg = c.message.length > 14 ? c.message.slice(0, 14) + "\u2026" : c.message;
-        msgLabel.textContent = shortMsg;
-        svg.appendChild(msgLabel);
-    });
- 
-    // group branch names by which commit they currently point at (tip)
-    const branchesByTip = {};
-    for (const [name, tipId] of Object.entries(repo.branches)) {
-        if (!tipId) continue;
-        if (!branchesByTip[tipId]) branchesByTip[tipId] = [];
-        branchesByTip[tipId].push(name);
-    }
- 
-    for (const [tipId, names] of Object.entries(branchesByTip)) {
-        const pos = positions[tipId];
-        if (!pos) continue;
- 
-        names.forEach((name, i) => {
-            const isHead = name === repo.HEAD;
-            const label = document.createElementNS(svgNS, "text");
-            label.setAttribute("x", pos.x);
-            label.setAttribute("y", pos.y - radius - 10 - i * 16);
-            label.setAttribute("text-anchor", "middle");
-            label.setAttribute("font-size", "12");
-            label.setAttribute("font-weight", isHead ? "bold" : "normal");
-            label.setAttribute("fill", isHead ? "#f97316" : "#171717");
-            label.textContent = isHead ? `${name} (HEAD)` : name;
-            svg.appendChild(label);
-        });
-    }
- 
-    container.appendChild(svg);
-    
-}
+<file path="src/content/chapters.js">
+export const chapters = [
+  {
+    id: "intro",
+    title: "What is Git?",
+    text: "Git tracks changes to your files over time. Every change you save becomes a 'commit' — a snapshot you can always come back to.",
+    unlocksOn: "init"
+  },
+  {
+    id: "staging",
+    title: "Staging & Commits",
+    text: "Before a change becomes a commit, it's 'staged' — marked as ready to be saved. Use 'git add <file>' to stage, then 'git commit -m \"message\"' to save it permanently.",
+    unlocksOn: "commit"
+  },
+  {
+    id: "branching",
+    title: "Branching",
+    text: "A branch is an independent line of work. 'git branch <name>' creates one, 'git checkout <name>' switches to it. Changes on one branch don't affect another until you merge.",
+    unlocksOn: "branch"
+  },
+  {
+    id: "merging",
+    title: "Merging",
+    text: "'git merge <branch>' brings another branch's changes into your current one. If your branch hasn't diverged, it's a simple 'fast-forward'. If both branches have unique commits, Git needs you to resolve the difference.",
+    unlocksOn: "merge"
+  },
+  {
+    id: "remotes",
+    title: "Remotes",
+    text: "A remote (like GitHub) is a copy of your repo hosted elsewhere. 'git push' sends your commits there.",
+    unlocksOn: "push"
+  }
+];
 </file>
 
 <file path="src/components/buildElement.js">
@@ -233,6 +152,130 @@ export function buildElement(parentElement, tagName, text, options = {} ){
 //         autocomplete: 'off'
 //     }
 // });
+</file>
+
+<file path="src/components/graphRenderer.js">
+export function renderGraph(repo, container) {
+    
+
+    container.innerHTML = "";
+
+    if (!repo.initialized || repo.commits.length === 0)     {
+        const msg = document.createElement("div");
+        msg.className = "placeholder-text";
+        msg.textContent = repo.initialized
+        ? "[ No commits yet]"
+        : "[Run 'git init' to get started ]";
+        container.appendChild(msg);
+        return;
+
+    }
+
+const commits = [...repo.commits].reverse();
+
+const spacingX = 100;
+const startX = 60;
+const rowY = 150;
+const radius = 20;
+
+const positions = {};
+commits.forEach((c, i) => {
+    positions[c.id] ={ x:startX + i * spacingX, y: rowY };
+ 
+});
+
+const width = Math.max(400, startX + commits.length * spacingX +60);
+
+
+const height = 300;
+ 
+const svgNS = "http://www.w3.org/2000/svg";
+const svg = document.createElementNS(svgNS, "svg");
+svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+svg.setAttribute("width", "100%");
+svg.setAttribute("height", "100%");
+
+commits.forEach((c) => {
+    if (c.parentId && positions[c.parentId]) {
+        const from = positions[c.parentId];
+        const to = positions[c.id];
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", from.x);
+        line.setAttribute("y1", from.y);
+        line.setAttribute("x2", to.x);
+        line.setAttribute("y2", to.y);
+        line.setAttribute("stroke", "#adb5bd" );
+        line.setAttribute("stroke-width", "2");
+        svg.appendChild(line);
+
+
+
+    }
+
+});
+
+commits.forEach((c) => {
+    const pos = positions[c.id];
+
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.setAttribute("cx", pos.x);
+         circle.setAttribute("cy", pos.y);
+        circle.setAttribute("r", radius);
+        circle.setAttribute("fill", "#4ade80");
+        circle.setAttribute("stroke", "#171717");
+        circle.setAttribute("stroke-width", "2");
+        svg.appendChild(circle);
+
+
+           const idLabel = document.createElementNS(svgNS, "text");
+        idLabel.setAttribute("x", pos.x);
+        idLabel.setAttribute("y", pos.y + radius + 16);
+        idLabel.setAttribute("text-anchor", "middle");
+        idLabel.setAttribute("font-size", "11");
+        idLabel.setAttribute("fill", "#333");
+        idLabel.textContent = c.id;
+        svg.appendChild(idLabel);
+
+                const msgLabel = document.createElementNS(svgNS, "text");
+                msgLabel.setAttribute("x", pos.x);
+                msgLabel.setAttribute("y", pos.y + radius + 32);
+                msgLabel.setAttribute("text-anchor", "middle");
+                msgLabel.setAttribute("font-size", "10");
+                msgLabel.setAttribute("fill", "#666");
+                const shortMsg = c.message.length > 14 ? c.message.slice(0, 14) + "\u2026" : c.message;
+                msgLabel.textContent = shortMsg;
+                svg.appendChild(msgLabel);
+            });
+
+
+   const branchesByTip = {};
+    for (const [name, tipId] of Object.entries(repo.branches)) {
+        if (!tipId) continue;
+        if (!branchesByTip[tipId]) branchesByTip[tipId] = [];
+        branchesByTip[tipId].push(name);
+    }
+ 
+    for (const [tipId, names] of Object.entries(branchesByTip)) {
+        const pos = positions[tipId];
+        if (!pos) continue;
+ 
+        names.forEach((name, i) => {
+            const isHead = name === repo.HEAD;
+            const label = document.createElementNS(svgNS, "text");
+            label.setAttribute("x", pos.x);
+            label.setAttribute("y", pos.y - radius - 10 - i * 16);
+            label.setAttribute("text-anchor", "middle");
+            label.setAttribute("font-size", "12");
+            label.setAttribute("font-weight", isHead ? "bold" : "normal");
+            label.setAttribute("fill", isHead ? "#f97316" : "#171717");
+            label.textContent = isHead ? `${name} (HEAD)` : name;
+            svg.appendChild(label);
+        });
+    }
+ 
+    container.appendChild(svg);
+
+}
 </file>
 
 <file path="src/models/Commit.js">
@@ -496,6 +539,8 @@ Come back with your code (or just tell me which version, if something's stuck) a
 
 <file path="src/engine/GitEngine.js">
 import { Commit } from '../models/Commit.js';
+import { chapters } from '../content/chapters.js';
+
 
 export class GitEngine {
     constructor() {
@@ -506,32 +551,43 @@ export class GitEngine {
             branches: { main: null },
             HEAD: "main"
         };
+        this.currentChapterIndex = 0;
+
+
+        
     }
 
-    execute(input) {
-        const parts = input.trim().split(" ");
-        const command = parts[0];
-        const subcommand = parts[1];
-        const args = parts.slice(2);
+   execute(input) {
+    const parts = input.trim().split(" ");
+    const command = parts[0];
+    const subcommand = parts[1];
+    const args = parts.slice(2);
 
-        if (command !== "git") return `command not found: ${command}`;
-        if (!subcommand) return "usage: git <command> [<args>]";
+    if (command !== "git") return `command not found: ${command}`;
+    if (!subcommand) return "usage: git <command> [<args>]";
 
-        switch (subcommand) {
-            case "init": return this.init();
-            case "add": return this.add(args);
-            case "commit": return this.commit(args.join(" "));
-            case "status": return this.status();
-            case "log": return this.log();
-            case "push": return this.push();
-            case "branch": return this.branch(args);
-            case "checkout":
-            case "switch": return this.checkout(args);
-            case "merge": return this.merge(args);
-
-            default: return `git: '${subcommand}' is not a git command`;
-        }
+    let result;
+    switch (subcommand) {
+        case "init": result = this.init(); break;
+        case "add": result = this.add(args); break;
+        case "commit": result = this.commit(args.join(" ")); break;
+        case "status": result = this.status(); break;
+        case "log": result = this.log(); break;
+        case "push": return this.push(); // leave push as-is, it's already a Promise
+        case "branch": result = this.branch(args); break;
+        case "checkout":
+        case "switch": result = this.checkout(args); break;
+        case "merge": result = this.merge(args); break;
+        default: result = `git: '${subcommand}' is not a git command`;
     }
+
+    if (typeof result === "string" && !result.startsWith("fatal") && !result.startsWith("error") && !result.startsWith("usage")) {
+        this.advanceChapterIfMatched(subcommand);
+    }
+    this.save();
+    return result;
+}
+    
 
     init() {
         if (this.repo.initialized) {
@@ -608,6 +664,20 @@ export class GitEngine {
             }, 2000);
         });
     }
+
+
+    save() {
+  localStorage.setItem("git-sim-repo", JSON.stringify(this.repo));
+  localStorage.setItem("git-sim-chapter", this.currentChapterIndex);
+}
+
+load() {
+  const savedRepo = localStorage.getItem("git-sim-repo");
+  const savedChapter = localStorage.getItem("git-sim-chapter");
+  if (savedRepo) this.repo = JSON.parse(savedRepo);
+  if (savedChapter !== null) this.currentChapterIndex = parseInt(savedChapter, 10);
+}
+
 
 // helpout
 
@@ -688,7 +758,22 @@ export class GitEngine {
         }
         return history;
     }
+
+    getCurrentChapter() {
+  return chapters[this.currentChapterIndex];
 }
+
+advanceChapterIfMatched(subcommand) {
+  const next = chapters[this.currentChapterIndex + 1];
+  if (next && next.unlocksOn === subcommand) this.currentChapterIndex++;
+}
+
+reset() {
+  localStorage.removeItem("git-sim-repo");
+  localStorage.removeItem("git-sim-chapter");
+  location.reload();
+}
+};
 </file>
 
 <file path="package.json">
@@ -715,7 +800,10 @@ export class GitEngine {
   "bugs": {
     "url": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab/issues"
   },
-  "homepage": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab#readme"
+  "homepage": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab#readme",
+  "dependencies": {
+    "repomix": "^1.18.0"
+  }
 }
 </file>
 
@@ -823,15 +911,6 @@ study. Does not block or change v0.6 (OOP/Classes) — resumes main roadmap afte
 - Three-panel grid layout: terminal (left), commit graph placeholder (center), theory panel (right)
 - Top navbar with logo, brand, and placeholder chapter name
 - Base CSS styling (dark terminal theme, grid-paper background on visual panel)
-</file>
-
-<file path=".gitignore">
-node_modules/
-dist/
-.DS_Store
-repomix-output.xml
-*.log
-.vscode/
 </file>
 
 <file path="style.css">
@@ -1150,6 +1229,15 @@ git merge b     → should print "Merge conflict simulation: both branches have 
 ---
 </file>
 
+<file path=".gitignore">
+node_modules/
+dist/
+.DS_Store
+repomix-output.xml
+*.log
+.vscode/
+</file>
+
 <file path="README.md">
 # Git-Sim — Interactive Git Learning Lab
 
@@ -1243,8 +1331,8 @@ common, permissive default for this kind of project).
 
 <file path="src/events/terminalEvents.js">
 import { buildElement } from '../components/buildElement.js';
-import { renderGraph } from '..components/graphRenderer.js';
-
+import { renderGraph } from '../components/graphRenderer.js';
+import { renderTheoryPanel } from '../app.js';
 
 export function setupTerminalEvents(DOM, engine) {
     const newDiv = buildElement(DOM.terminalContent, 'div', '', { className: 'terminal-input-line' });
@@ -1291,9 +1379,10 @@ export function setupTerminalEvents(DOM, engine) {
             }
         }
         
-        renderGraph(engine, repo, DOM.graphContainer);
+        renderGraph(engine.repo, DOM.graphContainer);
         DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
-    
+
+        renderTheoryPanel()
         
         }
     });
@@ -1395,30 +1484,25 @@ const DOM = {
     graphContainer: document.querySelector('.visual-panel'),
 
 
-};
+};const engine = new GitEngine();
+engine.load();
 
-const engine = new GitEngine();
+export function renderTheoryPanel() {
+    DOM.theoryContent.innerHTML = "";
+    const chapter = engine.getCurrentChapter();
+    if (!chapter) return;
+    buildElement(DOM.theoryContent, 'h1', chapter.title, { className: 'currentChapterHeader' });
+    buildElement(DOM.theoryContent, 'p', chapter.text, { className: 'terminal-output-text' });
+}
 
- 
-buildElement(DOM.theoryContent, 'h1', 'Understanding Git Status', {
-    className: 'currentChapterHeader',
-});
-
-
-buildElement(DOM.theoryContent, 'p', 'When you type a command in the terminal on the left, this panel will explain the underlying theory, while the center panel maps out the commits visually.',
-     {
-    className: 'terminal-output-text',
-});
-
-const userClickOutput = buildElement(DOM.terminalContent, 'p', '', {
-    className: 'userClickedOutput',
-})
+renderTheoryPanel();
+renderGraph(engine.repo, DOM.graphContainer);
+setupTerminalEvents(DOM, engine);
 
 
 
 
-
-renderGraph(engine, repo, DOM.graphContainer);
+renderGraph(engine.repo, DOM.graphContainer);
 setupTerminalEvents(DOM, engine);
 </file>
 

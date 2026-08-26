@@ -21,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab/issues"
   },
-  "homepage": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab#readme"
+  "homepage": "https://github.com/ayushmishra34er/Git-Sim-Interactive-Git-Learning-Lab#readme",
+  "dependencies": {
+    "repomix": "^1.18.0"
+  }
 }
