@@ -206,3 +206,30 @@ main {
     border-bottom: 2px solid #e5e5e5;
     padding-bottom: 10px;
 }
+
+.terminal-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #00ff00;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1rem;
+    flex: 1;
+    caret-color: #00ff00;
+}
+
+#reset-btn {
+    background: #333;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#reset-btn:hover {
+    background: #ff5f56;
+    color: #171717;
+}
