@@ -1,6 +1,6 @@
 import { buildElement } from '../components/buildElement.js';
 import { renderGraph } from '../components/graphRenderer.js';
-
+import { renderTheoryPanel } from '../app.js';
 
 export function setupTerminalEvents(DOM, engine) {
     const newDiv = buildElement(DOM.terminalContent, 'div', '', { className: 'terminal-input-line' });
@@ -49,7 +49,8 @@ export function setupTerminalEvents(DOM, engine) {
         
         renderGraph(engine.repo, DOM.graphContainer);
         DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
-    
+
+        renderTheoryPanel()
         
         }
     });

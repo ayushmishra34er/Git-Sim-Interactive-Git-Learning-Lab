@@ -1,4 +1,6 @@
 import { Commit } from '../models/Commit.js';
+import { chapters } from '../content/chapters.js';
+
 
 export class GitEngine {
     constructor() {
@@ -9,32 +11,43 @@ export class GitEngine {
             branches: { main: null },
             HEAD: "main"
         };
+        this.currentChapterIndex = 0;
+
+
+        
     }
 
-    execute(input) {
-        const parts = input.trim().split(" ");
-        const command = parts[0];
-        const subcommand = parts[1];
-        const args = parts.slice(2);
+   execute(input) {
+    const parts = input.trim().split(" ");
+    const command = parts[0];
+    const subcommand = parts[1];
+    const args = parts.slice(2);
 
-        if (command !== "git") return `command not found: ${command}`;
-        if (!subcommand) return "usage: git <command> [<args>]";
+    if (command !== "git") return `command not found: ${command}`;
+    if (!subcommand) return "usage: git <command> [<args>]";
 
-        switch (subcommand) {
-            case "init": return this.init();
-            case "add": return this.add(args);
-            case "commit": return this.commit(args.join(" "));
-            case "status": return this.status();
-            case "log": return this.log();
-            case "push": return this.push();
-            case "branch": return this.branch(args);
-            case "checkout":
-            case "switch": return this.checkout(args);
-            case "merge": return this.merge(args);
-
-            default: return `git: '${subcommand}' is not a git command`;
-        }
+    let result;
+    switch (subcommand) {
+        case "init": result = this.init(); break;
+        case "add": result = this.add(args); break;
+        case "commit": result = this.commit(args.join(" ")); break;
+        case "status": result = this.status(); break;
+        case "log": result = this.log(); break;
+        case "push": return this.push(); // leave push as-is, it's already a Promise
+        case "branch": result = this.branch(args); break;
+        case "checkout":
+        case "switch": result = this.checkout(args); break;
+        case "merge": result = this.merge(args); break;
+        default: result = `git: '${subcommand}' is not a git command`;
     }
+
+    if (typeof result === "string" && !result.startsWith("fatal") && !result.startsWith("error") && !result.startsWith("usage")) {
+        this.advanceChapterIfMatched(subcommand);
+    }
+    this.save();
+    return result;
+}
+    
 
     init() {
         if (this.repo.initialized) {
@@ -111,6 +124,20 @@ export class GitEngine {
             }, 2000);
         });
     }
+
+
+    save() {
+  localStorage.setItem("git-sim-repo", JSON.stringify(this.repo));
+  localStorage.setItem("git-sim-chapter", this.currentChapterIndex);
+}
+
+load() {
+  const savedRepo = localStorage.getItem("git-sim-repo");
+  const savedChapter = localStorage.getItem("git-sim-chapter");
+  if (savedRepo) this.repo = JSON.parse(savedRepo);
+  if (savedChapter !== null) this.currentChapterIndex = parseInt(savedChapter, 10);
+}
+
 
 // helpout
 
@@ -191,4 +218,19 @@ export class GitEngine {
         }
         return history;
     }
+
+    getCurrentChapter() {
+  return chapters[this.currentChapterIndex];
 }
+
+advanceChapterIfMatched(subcommand) {
+  const next = chapters[this.currentChapterIndex + 1];
+  if (next && next.unlocksOn === subcommand) this.currentChapterIndex++;
+}
+
+reset() {
+  localStorage.removeItem("git-sim-repo");
+  localStorage.removeItem("git-sim-chapter");
+  location.reload();
+}
+};
