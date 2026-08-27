@@ -10,10 +10,17 @@ const DOM = {
     terminalContent: document.querySelector('.terminal-content'),
     theoryContent: document.querySelector('.theory-content'),
     graphContainer: document.querySelector('.visual-panel'),
+    resetBtn : document.getElementById('reset-btn'),
+};
 
 
-};const engine = new GitEngine();
+const engine = new GitEngine();
 engine.load();
+
+
+    DOM.resetBtn.addEventListener('click', () => {
+    engine.reset();
+});
 
 export function renderTheoryPanel() {
     DOM.theoryContent.innerHTML = "";
@@ -27,8 +34,3 @@ renderTheoryPanel();
 renderGraph(engine.repo, DOM.graphContainer);
 setupTerminalEvents(DOM, engine);
 
-
-
-
-renderGraph(engine.repo, DOM.graphContainer);
-setupTerminalEvents(DOM, engine);
