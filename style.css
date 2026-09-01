@@ -1,85 +1,109 @@
+Style · CSS
+/* ============================================================
+   Git-Sim — Consolidated Stylesheet
+   Organized by section. Read the comments before adding new
+   rules elsewhere — this is the single source of truth for layout.
+   ============================================================ */
+
+/* --- Reset --- */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
 
+html,
+body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 body {
-    margin: 0;
-    height: 100vh;
-
     display: flex;
     flex-direction: column;
     overflow: hidden;
-
-
 }
 
 header {
+    height: 50px;
+    flex: 0 0 auto;
     background-color: #171717;
     color: white;
-    height: 50px;
-
-
-
+    display: flex;
+    align-items: center;
+    width: 100%;
 }
 
 header nav {
-
-    padding: 0 20px;
+    width: 100%;
     height: 100%;
-
-
-
-
-}
-
-header nav ul {
     display: flex;
-    height: 100%;
     align-items: center;
-    list-style-type: none;
-    gap: 20px;
-
-
-
+    justify-content: space-between;
+    padding: 0 20px;
 }
 
-header nav ul .brand {
+.nav-left,
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.brand {
     font-weight: 900;
     color: #4ade80;
-
 }
 
-header nav ul .chapter {
-    margin-left: auto;
+.chapter {
     color: #a3a3a3;
     font-style: italic;
 }
 
+#reset-btn {
+    background: #333;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
 
+#reset-btn:hover {
+    background: #ff5f56;
+    color: #171717;
+}
+
+#reset-btn:hover {
+    background: #ff5f56;
+    color: #171717;
+}
+
+/* --- Main layout: three panels side by side ---
+   `min-height: 0` here is load-bearing — without it, `main` grows to fit
+   its tallest child instead of being clipped to the viewport, which is
+   what was causing the whole page to scroll instead of just the terminal. */
 main {
     display: flex;
     flex-direction: row;
     flex: 1;
-
+    min-height: 0;
 }
 
+/* Base panel: shared by all three. Panels themselves never scroll as a
+   whole — only specific inner elements (like .terminal-content) do. */
 .panel {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-
-
-    height: 100%;
-
-
-
-
+    min-height: 0;
+    overflow: hidden;
 }
 
+/* --- Left panel: terminal --- */
 .left-panel {
     background-color: #1e1e1e;
     color: #00ff00;
@@ -95,6 +119,7 @@ main {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex: 0 0 auto;
 }
 
 .dot {
@@ -115,96 +140,57 @@ main {
     background-color: #27c93f;
 }
 
-
-
-.cursor {
-    display: inline-block;
-    width: 8px;
-    height: 15px;
-    background-color: #00ff00;
-    animation: blink 1s step-end infinite;
-    vertical-align: middle;
+/* Scrollable output area — the ONLY thing that scrolls inside the terminal */
+.terminal-content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+    padding: 8px 10px;
 }
 
-.visual-panel {
-    background-color: #f8f9fa;
-    border-right: 2px solid #dee2e6;
-    position: relative;
-    /* Grid paper background effect */
-    background-image:
-        linear-gradient(#e9ecef 1px, transparent 1px),
-        linear-gradient(90deg, #e9ecef 1px, transparent 1px);
-
-
-    background-size: 20px 20px;
+.terminal-content::-webkit-scrollbar {
+    width: 6px;
 }
 
-
-.placeholder-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #adb5bd;
-    font-size: 1.2rem;
-    font-weight: bold;
+.terminal-content::-webkit-scrollbar-track {
+    background: transparent;
 }
 
-.theory-panel {
-    background-color: #ffffff;
-    color: #333;
+.terminal-content::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
 }
 
-.window-controls {
+.terminal-content {
+    scrollbar-width: thin;
+    scrollbar-color: #444 transparent;
+}
+
+.terminal-output {
+    color: #ccc;
+    white-space: pre-wrap;
+    margin-bottom: 2px;
+}
+
+/* Fixed input row — always pinned at the bottom of the terminal panel,
+   never scrolls, never grows. */
+.terminal-input-row {
+    flex: 0 0 auto;
+    border-top: 1px solid #333;
+    padding: 8px 10px;
     display: flex;
-    list-style-type: none;
-    gap: 15px;
-    flex-direction: row-reverse;
-    background-color: #e5e5e5;
-    padding: 8px 15px;
-    border-bottom: 1px solid #ccc;
 }
 
-.right-panel ul {
+.terminal-input-line {
     display: flex;
-    list-style-type: none;
-    gap: 10px;
-    flex-direction: row-reverse;
-    background-color: burlywood;
-
+    align-items: center;
+    width: 100%;
+    gap: 6px;
 }
 
-.right-panel ul li {
-    margin-right: 8px;
-    cursor: pointer;
-    transition: all ease-in-out;
-}
-
-.right-panel ul li:hover {
-    transform: scale(1.2);
-    font-weight: 400;
-    margin-left: 15px;
-}
-
-
-.divider {
-    background-color: black;
-    cursor: col-resize;
-    color: white;
-
-
-}
-
-.theory-content {
-    padding: 30px;
-    line-height: 1.7;
-}
-
-.theory-content h1 {
-    margin-bottom: 20px;
-    color: #171717;
-    border-bottom: 2px solid #e5e5e5;
-    padding-bottom: 10px;
+.prompt-text {
+    color: #4ade80;
+    white-space: nowrap;
 }
 
 .terminal-input {
@@ -216,20 +202,66 @@ main {
     font-size: 1rem;
     flex: 1;
     caret-color: #00ff00;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
-#reset-btn {
-    background: #333;
-    color: #ccc;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 4px 12px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.2s;
+/* Reserved for a future blinking cursor effect — not wired up yet */
+.cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background-color: #00ff00;
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
 }
 
-#reset-btn:hover {
-    background: #ff5f56;
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* --- Middle panel: commit graph --- */
+.visual-panel {
+    background-color: #f8f9fa;
+    border-right: 2px solid #dee2e6;
+    position: relative;
+    background-image:
+        linear-gradient(#e9ecef 1px, transparent 1px),
+        linear-gradient(90deg, #e9ecef 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.placeholder-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #adb5bd;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+/* --- Right panel: theory --- */
+.right-panel {
+    background-color: #ffffff;
+    color: #333;
+}
+
+.theory-content {
+    padding: 30px;
+    line-height: 1.7;
+    overflow-y: auto;
+}
+
+.theory-content h1 {
+    margin-bottom: 20px;
     color: #171717;
+    border-bottom: 2px solid #e5e5e5;
+    padding-bottom: 10px;
+}
+
+.terminal-output-text {
+    color: #555;
 }
