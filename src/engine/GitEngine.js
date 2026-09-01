@@ -73,7 +73,7 @@ export class GitEngine {
         if (!this.repo.initialized) return "fatal: not a git repository";
         if (this.repo.staged.length === 0) return "nothing to commit, working tree clean";
 
-        const messageMatch = input.match(/-m\s+"([^"]+)"/);
+        const messageMatch = input.match(/-m\s*"([^"]+)"/);
         const message = messageMatch ? messageMatch[1] : "no message";
 
         const parentId = this.repo.branches[this.repo.HEAD]

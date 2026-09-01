@@ -7,10 +7,13 @@ import {renderGraph} from './components/graphRenderer.js';
 
 //selectors
 const DOM = {
-    terminalContent: document.querySelector('.terminal-content'),
+
+    terminalOutput: document.querySelector('#terminal-output'),
+    terminalInputRow: document.querySelector('#terminal-input-row'),
     theoryContent: document.querySelector('.theory-content'),
     graphContainer: document.querySelector('.visual-panel'),
-    resetBtn : document.getElementById('reset-btn'),
+    resetBtn : document.querySelector('#reset-btn'),
+
 };
 
 
@@ -28,6 +31,8 @@ export function renderTheoryPanel() {
     if (!chapter) return;
     buildElement(DOM.theoryContent, 'h1', chapter.title, { className: 'currentChapterHeader' });
     buildElement(DOM.theoryContent, 'p', chapter.text, { className: 'terminal-output-text' });
+    document.getElementById('chapter-label').textContent = `Chapter: ${chapter.title}`;
+
 }
 
 renderTheoryPanel();

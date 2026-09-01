@@ -61,6 +61,7 @@ src/
   app.js
 .gitignore
 index.html
+LICENSE
 package.json
 README.md
 style.css
@@ -69,39 +70,28 @@ style.css
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/content/chapters.js">
-export const chapters = [
-  {
-    id: "intro",
-    title: "What is Git?",
-    text: "Git tracks changes to your files over time. Every change you save becomes a 'commit' — a snapshot you can always come back to.",
-    unlocksOn: "init"
-  },
-  {
-    id: "staging",
-    title: "Staging & Commits",
-    text: "Before a change becomes a commit, it's 'staged' — marked as ready to be saved. Use 'git add <file>' to stage, then 'git commit -m \"message\"' to save it permanently.",
-    unlocksOn: "commit"
-  },
-  {
-    id: "branching",
-    title: "Branching",
-    text: "A branch is an independent line of work. 'git branch <name>' creates one, 'git checkout <name>' switches to it. Changes on one branch don't affect another until you merge.",
-    unlocksOn: "branch"
-  },
-  {
-    id: "merging",
-    title: "Merging",
-    text: "'git merge <branch>' brings another branch's changes into your current one. If your branch hasn't diverged, it's a simple 'fast-forward'. If both branches have unique commits, Git needs you to resolve the difference.",
-    unlocksOn: "merge"
-  },
-  {
-    id: "remotes",
-    title: "Remotes",
-    text: "A remote (like GitHub) is a copy of your repo hosted elsewhere. 'git push' sends your commits there.",
-    unlocksOn: "push"
-  }
-];
+<file path="LICENSE">
+MIT License
+
+Copyright (c) 2026 Ayush Mishra
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 </file>
 
 <file path="src/components/buildElement.js">
@@ -156,78 +146,92 @@ export function buildElement(parentElement, tagName, text, options = {} ){
 
 <file path="src/components/graphRenderer.js">
 export function renderGraph(repo, container) {
-    
-
     container.innerHTML = "";
 
-    if (!repo.initialized || repo.commits.length === 0)     {
+    if (!repo.initialized || repo.commits.length === 0) {
         const msg = document.createElement("div");
         msg.className = "placeholder-text";
         msg.textContent = repo.initialized
-        ? "[ No commits yet]"
-        : "[Run 'git init' to get started ]";
+            ? "[ No commits yet ]"
+            : "[ Run 'git init' to get started ]";
         container.appendChild(msg);
         return;
-
     }
 
-const commits = [...repo.commits].reverse();
+    const commits = [...repo.commits].reverse(); // oldest first
+    const commitById = {};
+    commits.forEach((c) => (commitById[c.id] = c));
 
-const spacingX = 100;
-const startX = 60;
-const rowY = 150;
-const radius = 20;
+    // Assign each branch a lane. 'main' always gets lane 0 (top row) if it exists.
+    const branchNames = Object.keys(repo.branches);
+    branchNames.sort((a, b) => (a === "main" ? -1 : b === "main" ? 1 : 0));
 
-const positions = {};
-commits.forEach((c, i) => {
-    positions[c.id] ={ x:startX + i * spacingX, y: rowY };
- 
-});
+    // Walk each branch backward from its tip. A commit only gets claimed by the FIRST
+    // branch (in lane order) that reaches it — so shared ancestor commits stay on main's
+    // lane, and a branch only gets its own lane for commits unique to it.
+    const laneOf = {};
+    branchNames.forEach((branchName, laneIndex) => {
+        let cursor = repo.branches[branchName];
+        while (cursor && !(cursor in laneOf)) {
+            laneOf[cursor] = laneIndex;
+            const c = commitById[cursor];
+            cursor = c ? c.parentId : null;
+        }
+    });
 
-const width = Math.max(400, startX + commits.length * spacingX +60);
+    const spacingX = 100;
+    const startX = 60;
+    const laneHeight = 70;
+    const topPadding = 60;
+    const radius = 20;
 
+    const positions = {};
+    commits.forEach((c, i) => {
+        const lane = laneOf[c.id] ?? 0;
+        positions[c.id] = { x: startX + i * spacingX, y: topPadding + lane * laneHeight };
+    });
 
-const height = 300;
- 
-const svgNS = "http://www.w3.org/2000/svg";
-const svg = document.createElementNS(svgNS, "svg");
-svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-svg.setAttribute("width", "100%");
-svg.setAttribute("height", "100%");
+    const maxLane = Math.max(0, ...Object.values(laneOf));
+    const width = Math.max(400, startX + commits.length * spacingX + 60);
+    const height = topPadding + (maxLane + 1) * laneHeight + 60;
 
-commits.forEach((c) => {
-    if (c.parentId && positions[c.parentId]) {
-        const from = positions[c.parentId];
-        const to = positions[c.id];
-        const line = document.createElementNS(svgNS, "line");
-        line.setAttribute("x1", from.x);
-        line.setAttribute("y1", from.y);
-        line.setAttribute("x2", to.x);
-        line.setAttribute("y2", to.y);
-        line.setAttribute("stroke", "#adb5bd" );
-        line.setAttribute("stroke-width", "2");
-        svg.appendChild(line);
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
 
+    // edges (drawn first, sit behind nodes) — a diagonal line here is exactly what shows
+    // a branch diverging from its parent's lane into its own
+    commits.forEach((c) => {
+        if (c.parentId && positions[c.parentId]) {
+            const from = positions[c.parentId];
+            const to = positions[c.id];
+            const line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", from.x);
+            line.setAttribute("y1", from.y);
+            line.setAttribute("x2", to.x);
+            line.setAttribute("y2", to.y);
+            line.setAttribute("stroke", "#adb5bd");
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+        }
+    });
 
+    // commit nodes + labels
+    commits.forEach((c) => {
+        const pos = positions[c.id];
 
-    }
-
-});
-
-commits.forEach((c) => {
-    const pos = positions[c.id];
-
-    const circle = document.createElementNS(svgNS, "circle");
-    circle.setAttribute("cx", pos.x);
-         circle.setAttribute("cy", pos.y);
+        const circle = document.createElementNS(svgNS, "circle");
+        circle.setAttribute("cx", pos.x);
+        circle.setAttribute("cy", pos.y);
         circle.setAttribute("r", radius);
         circle.setAttribute("fill", "#4ade80");
         circle.setAttribute("stroke", "#171717");
         circle.setAttribute("stroke-width", "2");
         svg.appendChild(circle);
 
-
-           const idLabel = document.createElementNS(svgNS, "text");
+        const idLabel = document.createElementNS(svgNS, "text");
         idLabel.setAttribute("x", pos.x);
         idLabel.setAttribute("y", pos.y + radius + 16);
         idLabel.setAttribute("text-anchor", "middle");
@@ -236,29 +240,29 @@ commits.forEach((c) => {
         idLabel.textContent = c.id;
         svg.appendChild(idLabel);
 
-                const msgLabel = document.createElementNS(svgNS, "text");
-                msgLabel.setAttribute("x", pos.x);
-                msgLabel.setAttribute("y", pos.y + radius + 32);
-                msgLabel.setAttribute("text-anchor", "middle");
-                msgLabel.setAttribute("font-size", "10");
-                msgLabel.setAttribute("fill", "#666");
-                const shortMsg = c.message.length > 14 ? c.message.slice(0, 14) + "\u2026" : c.message;
-                msgLabel.textContent = shortMsg;
-                svg.appendChild(msgLabel);
-            });
+        const msgLabel = document.createElementNS(svgNS, "text");
+        msgLabel.setAttribute("x", pos.x);
+        msgLabel.setAttribute("y", pos.y + radius + 32);
+        msgLabel.setAttribute("text-anchor", "middle");
+        msgLabel.setAttribute("font-size", "10");
+        msgLabel.setAttribute("fill", "#666");
+        const shortMsg = c.message.length > 14 ? c.message.slice(0, 14) + "\u2026" : c.message;
+        msgLabel.textContent = shortMsg;
+        svg.appendChild(msgLabel);
+    });
 
-
-   const branchesByTip = {};
+    // branch labels, grouped by which commit they currently point at
+    const branchesByTip = {};
     for (const [name, tipId] of Object.entries(repo.branches)) {
         if (!tipId) continue;
         if (!branchesByTip[tipId]) branchesByTip[tipId] = [];
         branchesByTip[tipId].push(name);
     }
- 
+
     for (const [tipId, names] of Object.entries(branchesByTip)) {
         const pos = positions[tipId];
         if (!pos) continue;
- 
+
         names.forEach((name, i) => {
             const isHead = name === repo.HEAD;
             const label = document.createElementNS(svgNS, "text");
@@ -272,10 +276,44 @@ commits.forEach((c) => {
             svg.appendChild(label);
         });
     }
- 
-    container.appendChild(svg);
 
+    container.appendChild(svg);
 }
+</file>
+
+<file path="src/content/chapters.js">
+export const chapters = [
+  {
+    id: "intro",
+    title: "What is Git?",
+    text: "Git tracks changes to your files over time. Every change you save becomes a 'commit' — a snapshot you can always come back to.",
+    unlocksOn: "init"
+  },
+  {
+    id: "staging",
+    title: "Staging & Commits",
+    text: "Before a change becomes a commit, it's 'staged' — marked as ready to be saved. Use 'git add <file>' to stage, then 'git commit -m \"message\"' to save it permanently.",
+    unlocksOn: "commit"
+  },
+  {
+    id: "branching",
+    title: "Branching",
+    text: "A branch is an independent line of work. 'git branch <name>' creates one, 'git checkout <name>' switches to it. Changes on one branch don't affect another until you merge.",
+    unlocksOn: "branch"
+  },
+  {
+    id: "merging",
+    title: "Merging",
+    text: "'git merge <branch>' brings another branch's changes into your current one. If your branch hasn't diverged, it's a simple 'fast-forward'. If both branches have unique commits, Git needs you to resolve the difference.",
+    unlocksOn: "merge"
+  },
+  {
+    id: "remotes",
+    title: "Remotes",
+    text: "A remote (like GitHub) is a copy of your repo hosted elsewhere. 'git push' sends your commits there.",
+    unlocksOn: "push"
+  }
+];
 </file>
 
 <file path="src/models/Commit.js">
@@ -537,6 +575,112 @@ This "linked list via parentId" model is literally how real git works internally
 Come back with your code (or just tell me which version, if something's stuck) and I'll review — same as before. If you get stuck mid-version on something confusing, don't grind for hours; come back with the specific error or behavior and we'll unblock it, then you keep going solo from there. That's the efficient way to use both your time and mine.
 </file>
 
+<file path="docs/CHANGELOG.md">
+# Changelog
+
+All notable changes to GitLab-Sim are logged here, per version. This is a running record —
+update it every time you tag a version, before you push. It's what lets you (or anyone else)
+understand what changed without reading every commit.
+
+---
+
+
+## [v0.6] — Classes / OOP Refactor
+### Changed
+- Replaced standalone `handleCommand()` + loose handler functions (`handleInit`,
+  `handleAdd`, etc.) with a `GitEngine` class — all command logic now lives in one
+  class, dispatched through a single `execute()` method
+- Replaced plain `Commit` object literals with a real `Commit` class (`src/models/Commit.js`)
+- Removed `state/repo.js` — repo state now lives inside `GitEngine`'s constructor
+  instead of a separate module
+- Removed `engine/commandParser.js` — fully replaced by `GitEngine.js`
+- `app.js` now creates a single `GitEngine` instance and passes it into
+  `setupTerminalEvents(DOM, engine)`; `terminalEvents.js` calls `engine.execute()`
+  instead of importing a standalone function
+
+### Fixed (carried over from v0.5.5 debugging)
+- `handleCommit` was calling `.toLocalString()` (doesn't exist) instead of
+  `.toLocaleString()` — was silently crashing every `git commit`, so no commit
+  ever actually got added to state
+- `terminalEvents.js` had a leftover duplicate `handleCommand()` call that ran
+  before the push-specific `if/else` — caused every command to execute twice,
+  and rendered `[object Promise]` in the terminal specifically for `git push`
+
+### Added
+- `parentId` field on `Commit` (defaults to `null`) — unused for now, laid in
+  ahead of time so v0.7's branch/merge data model doesn't require migrating
+  existing commit shape
+
+### Why
+Data/behavior is unchanged from v0.5.5 — this is a structural refactor per the
+roadmap's v0.6 spec, not a new-feature version. Verified: init, add, commit,
+status, log, push all produce identical output to pre-refactor behavior.
+
+## [v0.5.5] — In Progress
+### Added
+- `git push` command simulation using a real Promise + async/await
+- Simulated 2-second network delay with a "Pushing to origin..." loading message
+- Success/failure output after the simulated push completes
+
+### Why
+Custom pivot from the main roadmap to align project work with concurrent Promises/async-await
+study. Does not block or change v0.6 (OOP/Classes) — resumes main roadmap after this.
+
+---
+
+## [v0.5] — Modular Architecture
+### Changed
+- Refactored the single `app.js` file into ES Modules:
+  `state/repo.js`, `engine/commandParser.js`, `events/terminalEvents.js`, `utils/idGenerator.js`
+- `index.html` script loading updated to use ES Modules
+
+### Known issues introduced (see bug list / fix before tagging complete)
+- Script tags not marked `type="module"`
+- `repo` not exported from `state/repo.js`
+- Import path typo: `idGenerators.js` → should be `idGenerator.js`
+- `components/buildElement.js` referenced but not yet created
+- `setupTerminalEvents` imported but not invoked
+- `inputE1` / output element undefined inside `terminalEvents.js`
+
+---
+
+## [v0.4] — Real State Machine
+### Added
+- `repo` state object: `initialized`, `commits`, `staged`, `branches`, `HEAD`
+- Command parser (`handleCommand`) with real subcommand routing
+- `git init`, `git add`, `git commit -m "..."`, `git status`, `git log` — real logic, not echoed text
+- Regex-based parsing of `-m "message"` commit messages
+- Commit ID generation
+
+---
+
+## [v0.3] — Real Event Handling
+### Added
+- `keydown` listener on terminal input — Enter submits the command
+- Command echo displayed as new scrollback lines (fixed initial bug: was overwriting a single
+  static line instead of appending new ones)
+- Click event delegation on `.terminal-content` (practice — not yet used for real functionality)
+
+---
+
+## [v0.2] — DOM-Built Terminal UI
+### Added
+- `buildElement()` helper — reusable wrapper around `createElement`/`appendChild`/attribute-setting
+- Terminal input line and theory panel content built dynamically via JS instead of static HTML
+
+### Fixed
+- Initial bug where `buildElement` was called with a 3-argument signature, causing the options
+  object to be interpreted as `text` and rendered as `"[object Object]"`
+
+---
+
+## [v0.1] — Static Skeleton
+### Added
+- Three-panel grid layout: terminal (left), commit graph placeholder (center), theory panel (right)
+- Top navbar with logo, brand, and placeholder chapter name
+- Base CSS styling (dark terminal theme, grid-paper background on visual panel)
+</file>
+
 <file path="src/engine/GitEngine.js">
 import { Commit } from '../models/Commit.js';
 import { chapters } from '../content/chapters.js';
@@ -613,7 +757,7 @@ export class GitEngine {
         if (!this.repo.initialized) return "fatal: not a git repository";
         if (this.repo.staged.length === 0) return "nothing to commit, working tree clean";
 
-        const messageMatch = input.match(/-m\s+"([^"]+)"/);
+        const messageMatch = input.match(/-m\s*"([^"]+)"/);
         const message = messageMatch ? messageMatch[1] : "no message";
 
         const parentId = this.repo.branches[this.repo.HEAD]
@@ -807,110 +951,209 @@ reset() {
 }
 </file>
 
-<file path="docs/CHANGELOG.md">
-# Changelog
+<file path="docs/COMMANDS.md">
+# Commands Reference
 
-All notable changes to GitLab-Sim are logged here, per version. This is a running record —
-update it every time you tag a version, before you push. It's what lets you (or anyone else)
-understand what changed without reading every commit.
-
----
-
-
-## [v0.6] — Classes / OOP Refactor
-### Changed
-- Replaced standalone `handleCommand()` + loose handler functions (`handleInit`,
-  `handleAdd`, etc.) with a `GitEngine` class — all command logic now lives in one
-  class, dispatched through a single `execute()` method
-- Replaced plain `Commit` object literals with a real `Commit` class (`src/models/Commit.js`)
-- Removed `state/repo.js` — repo state now lives inside `GitEngine`'s constructor
-  instead of a separate module
-- Removed `engine/commandParser.js` — fully replaced by `GitEngine.js`
-- `app.js` now creates a single `GitEngine` instance and passes it into
-  `setupTerminalEvents(DOM, engine)`; `terminalEvents.js` calls `engine.execute()`
-  instead of importing a standalone function
-
-### Fixed (carried over from v0.5.5 debugging)
-- `handleCommit` was calling `.toLocalString()` (doesn't exist) instead of
-  `.toLocaleString()` — was silently crashing every `git commit`, so no commit
-  ever actually got added to state
-- `terminalEvents.js` had a leftover duplicate `handleCommand()` call that ran
-  before the push-specific `if/else` — caused every command to execute twice,
-  and rendered `[object Promise]` in the terminal specifically for `git push`
-
-### Added
-- `parentId` field on `Commit` (defaults to `null`) — unused for now, laid in
-  ahead of time so v0.7's branch/merge data model doesn't require migrating
-  existing commit shape
-
-### Why
-Data/behavior is unchanged from v0.5.5 — this is a structural refactor per the
-roadmap's v0.6 spec, not a new-feature version. Verified: init, add, commit,
-status, log, push all produce identical output to pre-refactor behavior.
-
-## [v0.5.5] — In Progress
-### Added
-- `git push` command simulation using a real Promise + async/await
-- Simulated 2-second network delay with a "Pushing to origin..." loading message
-- Success/failure output after the simulated push completes
-
-### Why
-Custom pivot from the main roadmap to align project work with concurrent Promises/async-await
-study. Does not block or change v0.6 (OOP/Classes) — resumes main roadmap after this.
+This file is the spec for how each simulated git command should behave — what it checks,
+what it mutates in `repo` state, and what output it returns. Treat this as the source of
+truth when implementing a command: write the row here first, then implement to match it.
+Update this file whenever you add or change a command's behavior.
 
 ---
 
-## [v0.5] — Modular Architecture
-### Changed
-- Refactored the single `app.js` file into ES Modules:
-  `state/repo.js`, `engine/commandParser.js`, `events/terminalEvents.js`, `utils/idGenerator.js`
-- `index.html` script loading updated to use ES Modules
+## Implemented (v0.4 — v0.5)
 
-### Known issues introduced (see bug list / fix before tagging complete)
-- Script tags not marked `type="module"`
-- `repo` not exported from `state/repo.js`
-- Import path typo: `idGenerators.js` → should be `idGenerator.js`
-- `components/buildElement.js` referenced but not yet created
-- `setupTerminalEvents` imported but not invoked
-- `inputE1` / output element undefined inside `terminalEvents.js`
+| Command | Preconditions checked | State mutated | Output |
+|---|---|---|---|
+| `git init` | none | `repo.initialized = true` | `"Initialized empty Git repository in /project/.git/"` (or "Reinitialized..." if already initialized) |
+| `git add <file>` | `repo.initialized` must be true | pushes filename into `repo.staged` | `""` (silent, matches real git behavior) |
+| `git add .` | `repo.initialized` must be true | pushes placeholder `"all_modified_files"` into `repo.staged` | `""` |
+| `git commit -m "msg"` | `repo.initialized`, `repo.staged.length > 0` | creates commit object, unshifts into `repo.commits`, clears `repo.staged` | `"[<branch> <id>] <message>\n 1 file changed"` |
+| `git status` | `repo.initialized` | none (read-only) | branch name + staged files, or "nothing to commit, working tree clean" |
+| `git log` | `repo.initialized`, `repo.commits.length > 0` | none (read-only) | formatted list of all commits, most recent first |
+`git branch <name>`|  `git checkout <name>` / `git switch <name>`
 
 ---
 
-## [v0.4] — Real State Machine
-### Added
-- `repo` state object: `initialized`, `commits`, `staged`, `branches`, `HEAD`
-- Command parser (`handleCommand`) with real subcommand routing
-- `git init`, `git add`, `git commit -m "..."`, `git status`, `git log` — real logic, not echoed text
-- Regex-based parsing of `-m "message"` commit messages
-- Commit ID generation
+## In Progress (v0.5.5)
+
+| Command | Preconditions checked | State mutated | Output |
+|---|---|---|---|
+| `git push` | `repo.initialized` | none yet (simulated — no real remote state tracked) | Async: shows `"Pushing to origin..."` then, after ~2s delay, a success message | `git merge <name>` | both branches must exist | fast-forward: current branch pointer moves to match target; diverged: no mutation | success message, or `"Merge conflict simulation: both branches have diverged"`|
 
 ---
 
-## [v0.3] — Real Event Handling
-### Added
-- `keydown` listener on terminal input — Enter submits the command
-- Command echo displayed as new scrollback lines (fixed initial bug: was overwriting a single
-  static line instead of appending new ones)
-- Click event delegation on `.terminal-content` (practice — not yet used for real functionality)
+## Planned (v0.7)
+
+| Command | Preconditions checked | State mutated | Output |
+|---|---|---|---|
+|  | `repo.initialized`, name doesn't already exist | adds new entry to `repo.branches` pointing at current HEAD's commit | confirmation, or error if branch exists |
+| | branch must exist | `repo.HEAD = <name>` | `"Switched to branch '<name>'"` or error |
+
 
 ---
 
-## [v0.2] — DOM-Built Terminal UI
-### Added
-- `buildElement()` helper — reusable wrapper around `createElement`/`appendChild`/attribute-setting
-- Terminal input line and theory panel content built dynamically via JS instead of static HTML
+## Deferred to v2.0+ (do not implement before v1.0 ships)
+`rebase`, `cherry-pick`, `bisect`, `reflog`, `stash` (full), `submodules`, `hooks`, `worktree`
 
-### Fixed
-- Initial bug where `buildElement` was called with a 3-argument signature, causing the options
-  object to be interpreted as `text` and rendered as `"[object Object]"`
+Recording these here (not just in ROADMAP.md) so if you're tempted mid-build to add one,
+check here first — it's already been decided these wait until after v1.0.
 
 ---
 
-## [v0.1] — Static Skeleton
-### Added
-- Three-panel grid layout: terminal (left), commit graph placeholder (center), theory panel (right)
-- Top navbar with logo, brand, and placeholder chapter name
-- Base CSS styling (dark terminal theme, grid-paper background on visual panel)
+## Data model reference (current, as of v0.4/v0.5)
+```js
+repo = {
+  initialized: boolean,
+  commits: [ { id, message, timestamp } ],   // will change shape in v0.7 — see below
+  staged: [ "filename", ... ],
+  branches: { main: [...] },                  // will change shape in v0.7 — see below
+  HEAD: "main"
+}
+```
+
+### Planned data model change at v0.7
+Commits will gain a `parentId` field (linked-list style, mirrors real git internals), and
+`branches` will change from arrays of commit ids to a simple pointer: `{ main: "commit-3" }`.
+This is necessary for the graph visualization to be able to walk commit history. Don't build
+new features on top of the current array-based `branches` shape — it's getting replaced.
+
+
+---
+git init
+git add .
+git commit -m "first commit"
+git branch feature
+git checkout feature
+git add .
+git commit -m "feature work"
+git log                      → should show 2 commits (feature branch's history)
+git checkout main
+git log                      → should show only 1 commit (main never moved)
+git merge feature
+git log                      → should now show 2 commits (fast-forwarded)
+git checkout main            (already on main, but test it doesn't break)
+git branch other
+git checkout other
+git add .
+git commit -m "other work"
+git checkout main
+git merge other               → should fast-forward again
+
+
+
+For a genuine divergence test:
+
+git branch a
+git branch b
+git checkout a
+git add . && git commit -m "a commit"
+git checkout b
+git add . && git commit -m "b commit"
+git checkout a
+git merge b     → should print "Merge conflict simulation: both branches have diverged"
+
+---
+</file>
+
+<file path=".gitignore">
+node_modules/
+dist/
+.DS_Store
+repomix-output.xml
+*.log
+.vscode/
+</file>
+
+<file path="README.md">
+# Git-Sim — Interactive Git Learning Lab
+
+A browser-based, JavaScript-simulated Git environment. Type real git commands into a
+terminal-style UI, watch a JS-powered engine parse and execute them against an in-memory
+fake repository, and see the resulting commit graph rendered live — with theory alongside
+so the "why," not just the "how," sticks.
+
+No real git is involved under the hood — this is a teaching simulation, not a wrapper
+around actual git. That's intentional: it means it's 100% safe to experiment in, and the
+whole engine is transparent, readable JavaScript rather than a black box.
+
+## Status: v0.5 (in progress — see known issues below)
+
+## Why this project exists
+
+Built as a learning-by-building exercise: rather than doing disconnected syntax exercises,
+every JS concept learned gets applied directly to extending this one app. See `docs/ROADMAP.md`
+for the full version-by-version plan and `docs/CHANGELOG.md` for what's actually shipped so far.
+
+## Features (current)
+
+- **Custom DOM engine** — a reusable `buildElement()` factory function used throughout instead
+  of hardcoded HTML, for real DOM-manipulation practice
+- **Command parser + state machine** — a JS object tracking repo state (init status, staged
+  files, commits, branches, HEAD), mutated by real command logic, not fake echoed text
+- **Modular architecture** — code is split by responsibility (`state/`, `engine/`, `events/`,
+  `components/`, `utils/`) using ES Modules
+
+## Supported commands (current)
+
+`git init` · `git add <file>` / `git add .` · `git commit -m "message"` · `git status` · `git log`
+
+See `docs/COMMANDS.md` for exact behavior specs, and what's planned next (`branch`, `checkout`,
+`merge`, and more).
+
+## Known issues (v0.5, pre-fix)
+
+The v0.4 → v0.5 modularization refactor is not yet fully wired — see the fix list below before
+this version is considered complete. Tracked in `docs/CHANGELOG.md` under `[v0.5]`.
+
+- Script tags in `index.html` need `type="module"`
+- `repo` needs to be exported from `state/repo.js`
+- Import path typo: `idGenerators.js` → `idGenerator.js`
+- `components/buildElement.js` needs to be created (currently only exists inline in old code)
+- `setupTerminalEvents()` needs to actually be called from `app.js`
+- `terminalEvents.js` needs its own local `inputE1`/output element references
+
+## How to run locally
+
+This project uses ES Modules (`import`/`export`), which browsers block over `file://` due to
+CORS. You need to serve it via a local server:
+
+**Option 1 — VS Code:** install the "Live Server" extension, right-click `index.html` → "Open with Live Server"
+
+**Option 2 — Python:**
+
+```bash
+python3 -m http.server
+```
+
+then visit `http://localhost:8000`
+
+## Project structure
+
+```
+src/
+├── app.js              entry point — wires everything together
+├── state/               repo state object
+├── engine/               command parser + git command logic
+├── components/           DOM-building helpers (buildElement)
+├── events/               terminal input event handling
+└── utils/                small helpers (id generation, etc.)
+docs/
+├── ROADMAP.md            full version-by-version build plan
+├── CHANGELOG.md          what shipped in each version
+└── COMMANDS.md           spec for each simulated git command
+```
+
+## Roadmap
+
+Full plan through v1.0 (and beyond) lives in `docs/ROADMAP.md`. Short version: DOM → events →
+real state → modular architecture → OOP → branching/merging + graph visualization → async →
+persistence → v1.0 ship.
+
+## License
+
+Not yet decided — add one before making the repo public-facing as a portfolio piece (MIT is a
+common, permissive default for this kind of project).
 </file>
 
 <file path="style.css">
@@ -1122,211 +1365,63 @@ main {
     border-bottom: 2px solid #e5e5e5;
     padding-bottom: 10px;
 }
-</file>
 
-<file path="docs/COMMANDS.md">
-# Commands Reference
-
-This file is the spec for how each simulated git command should behave — what it checks,
-what it mutates in `repo` state, and what output it returns. Treat this as the source of
-truth when implementing a command: write the row here first, then implement to match it.
-Update this file whenever you add or change a command's behavior.
-
----
-
-## Implemented (v0.4 — v0.5)
-
-| Command | Preconditions checked | State mutated | Output |
-|---|---|---|---|
-| `git init` | none | `repo.initialized = true` | `"Initialized empty Git repository in /project/.git/"` (or "Reinitialized..." if already initialized) |
-| `git add <file>` | `repo.initialized` must be true | pushes filename into `repo.staged` | `""` (silent, matches real git behavior) |
-| `git add .` | `repo.initialized` must be true | pushes placeholder `"all_modified_files"` into `repo.staged` | `""` |
-| `git commit -m "msg"` | `repo.initialized`, `repo.staged.length > 0` | creates commit object, unshifts into `repo.commits`, clears `repo.staged` | `"[<branch> <id>] <message>\n 1 file changed"` |
-| `git status` | `repo.initialized` | none (read-only) | branch name + staged files, or "nothing to commit, working tree clean" |
-| `git log` | `repo.initialized`, `repo.commits.length > 0` | none (read-only) | formatted list of all commits, most recent first |
-`git branch <name>`|  `git checkout <name>` / `git switch <name>`
-
----
-
-## In Progress (v0.5.5)
-
-| Command | Preconditions checked | State mutated | Output |
-|---|---|---|---|
-| `git push` | `repo.initialized` | none yet (simulated — no real remote state tracked) | Async: shows `"Pushing to origin..."` then, after ~2s delay, a success message | `git merge <name>` | both branches must exist | fast-forward: current branch pointer moves to match target; diverged: no mutation | success message, or `"Merge conflict simulation: both branches have diverged"`|
-
----
-
-## Planned (v0.7)
-
-| Command | Preconditions checked | State mutated | Output |
-|---|---|---|---|
-|  | `repo.initialized`, name doesn't already exist | adds new entry to `repo.branches` pointing at current HEAD's commit | confirmation, or error if branch exists |
-| | branch must exist | `repo.HEAD = <name>` | `"Switched to branch '<name>'"` or error |
-
-
----
-
-## Deferred to v2.0+ (do not implement before v1.0 ships)
-`rebase`, `cherry-pick`, `bisect`, `reflog`, `stash` (full), `submodules`, `hooks`, `worktree`
-
-Recording these here (not just in ROADMAP.md) so if you're tempted mid-build to add one,
-check here first — it's already been decided these wait until after v1.0.
-
----
-
-## Data model reference (current, as of v0.4/v0.5)
-```js
-repo = {
-  initialized: boolean,
-  commits: [ { id, message, timestamp } ],   // will change shape in v0.7 — see below
-  staged: [ "filename", ... ],
-  branches: { main: [...] },                  // will change shape in v0.7 — see below
-  HEAD: "main"
+.terminal-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #00ff00;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1rem;
+    flex: 1;
+    caret-color: #00ff00;
 }
-```
 
-### Planned data model change at v0.7
-Commits will gain a `parentId` field (linked-list style, mirrors real git internals), and
-`branches` will change from arrays of commit ids to a simple pointer: `{ main: "commit-3" }`.
-This is necessary for the graph visualization to be able to walk commit history. Don't build
-new features on top of the current array-based `branches` shape — it's getting replaced.
+#reset-btn {
+    background: #333;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
 
+#reset-btn:hover {
+    background: #ff5f56;
+    color: #171717;
+}
 
----
-git init
-git add .
-git commit -m "first commit"
-git branch feature
-git checkout feature
-git add .
-git commit -m "feature work"
-git log                      → should show 2 commits (feature branch's history)
-git checkout main
-git log                      → should show only 1 commit (main never moved)
-git merge feature
-git log                      → should now show 2 commits (fast-forwarded)
-git checkout main            (already on main, but test it doesn't break)
-git branch other
-git checkout other
-git add .
-git commit -m "other work"
-git checkout main
-git merge other               → should fast-forward again
+.left-panel {
+    display: flex;
+    flex-direction: column;
+}
 
+.terminal-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
 
+.terminal-output::-webkit-scrollbar,
+.terminal-content::-webkit-scrollbar {
+    width: 6px;
+}
 
-For a genuine divergence test:
+.terminal-content::-webkit-scrollbar-track {
+    background: transparent;
+}
 
-git branch a
-git branch b
-git checkout a
-git add . && git commit -m "a commit"
-git checkout b
-git add . && git commit -m "b commit"
-git checkout a
-git merge b     → should print "Merge conflict simulation: both branches have diverged"
+.terminal-content::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
 
----
-</file>
-
-<file path=".gitignore">
-node_modules/
-dist/
-.DS_Store
-repomix-output.xml
-*.log
-.vscode/
-</file>
-
-<file path="README.md">
-# Git-Sim — Interactive Git Learning Lab
-
-A browser-based, JavaScript-simulated Git environment. Type real git commands into a
-terminal-style UI, watch a JS-powered engine parse and execute them against an in-memory
-fake repository, and see the resulting commit graph rendered live — with theory alongside
-so the "why," not just the "how," sticks.
-
-No real git is involved under the hood — this is a teaching simulation, not a wrapper
-around actual git. That's intentional: it means it's 100% safe to experiment in, and the
-whole engine is transparent, readable JavaScript rather than a black box.
-
-## Status: v0.5 (in progress — see known issues below)
-
-## Why this project exists
-
-Built as a learning-by-building exercise: rather than doing disconnected syntax exercises,
-every JS concept learned gets applied directly to extending this one app. See `docs/ROADMAP.md`
-for the full version-by-version plan and `docs/CHANGELOG.md` for what's actually shipped so far.
-
-## Features (current)
-
-- **Custom DOM engine** — a reusable `buildElement()` factory function used throughout instead
-  of hardcoded HTML, for real DOM-manipulation practice
-- **Command parser + state machine** — a JS object tracking repo state (init status, staged
-  files, commits, branches, HEAD), mutated by real command logic, not fake echoed text
-- **Modular architecture** — code is split by responsibility (`state/`, `engine/`, `events/`,
-  `components/`, `utils/`) using ES Modules
-
-## Supported commands (current)
-
-`git init` · `git add <file>` / `git add .` · `git commit -m "message"` · `git status` · `git log`
-
-See `docs/COMMANDS.md` for exact behavior specs, and what's planned next (`branch`, `checkout`,
-`merge`, and more).
-
-## Known issues (v0.5, pre-fix)
-
-The v0.4 → v0.5 modularization refactor is not yet fully wired — see the fix list below before
-this version is considered complete. Tracked in `docs/CHANGELOG.md` under `[v0.5]`.
-
-- Script tags in `index.html` need `type="module"`
-- `repo` needs to be exported from `state/repo.js`
-- Import path typo: `idGenerators.js` → `idGenerator.js`
-- `components/buildElement.js` needs to be created (currently only exists inline in old code)
-- `setupTerminalEvents()` needs to actually be called from `app.js`
-- `terminalEvents.js` needs its own local `inputE1`/output element references
-
-## How to run locally
-
-This project uses ES Modules (`import`/`export`), which browsers block over `file://` due to
-CORS. You need to serve it via a local server:
-
-**Option 1 — VS Code:** install the "Live Server" extension, right-click `index.html` → "Open with Live Server"
-
-**Option 2 — Python:**
-
-```bash
-python3 -m http.server
-```
-
-then visit `http://localhost:8000`
-
-## Project structure
-
-```
-src/
-├── app.js              entry point — wires everything together
-├── state/               repo state object
-├── engine/               command parser + git command logic
-├── components/           DOM-building helpers (buildElement)
-├── events/               terminal input event handling
-└── utils/                small helpers (id generation, etc.)
-docs/
-├── ROADMAP.md            full version-by-version build plan
-├── CHANGELOG.md          what shipped in each version
-└── COMMANDS.md           spec for each simulated git command
-```
-
-## Roadmap
-
-Full plan through v1.0 (and beyond) lives in `docs/ROADMAP.md`. Short version: DOM → events →
-real state → modular architecture → OOP → branching/merging + graph visualization → async →
-persistence → v1.0 ship.
-
-## License
-
-Not yet decided — add one before making the repo public-facing as a portfolio piece (MIT is a
-common, permissive default for this kind of project).
+.terminal-input-row {
+    border-top: 1px solid #333;
+    padding: 8px 10px;
+}
 </file>
 
 <file path="src/events/terminalEvents.js">
@@ -1335,55 +1430,77 @@ import { renderGraph } from '../components/graphRenderer.js';
 import { renderTheoryPanel } from '../app.js';
 
 export function setupTerminalEvents(DOM, engine) {
-    const newDiv = buildElement(DOM.terminalContent, 'div', '', { className: 'terminal-input-line' });
+    const newDiv = buildElement(DOM.terminalInputRow, 'div', '', { className: 'terminal-input-line' });
     buildElement(newDiv, 'span', 'user@git-sim:~$ ', { className: 'prompt-text' });
     const inputE1 = buildElement(newDiv, 'input', '', {
         className: 'terminal-input',
         attributes: { type: 'text', placeholder: 'type a git command here ... ', autocomplete: 'off' }
     });
 
-    inputE1.addEventListener('keydown',async function (e) {
+    let commandHistory = [];
+    let historyIndex = -1;
+
+    inputE1.addEventListener('keydown', async function (e) {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex > 0) historyIndex--;
+            inputE1.value = commandHistory[historyIndex] ?? "";
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex < commandHistory.length - 1) {
+                historyIndex++;
+                inputE1.value = commandHistory[historyIndex];
+            } else {
+                historyIndex = commandHistory.length;
+                inputE1.value = "";
+            }
+            return;
+        }
+
         if (e.key === 'Enter') {
             const userCommand = inputE1.value;
 
-            buildElement(DOM.terminalContent, 'p', `user@git-sim:~$ ${userCommand}`, {
+            if (userCommand.trim() !== "") {
+                commandHistory.push(userCommand);
+                historyIndex = commandHistory.length;
+            }
+
+            buildElement(DOM.terminalOutput, 'p', `user@git-sim:~$ ${userCommand}`, {
                 className: 'terminal-output',
                 attributes: { style: 'color: #00ff00;' }
             });
 
-           
-
             inputE1.value = "";
-        
-        
-              if (userCommand.trim().startsWith("git push")) {
-            const loadingLine = buildElement(DOM.terminalContent, 'p', "Pushing to origin...", {
-                className: 'terminal-output',
-                attributes: { style: 'color: #ccc;' }
-            });
 
-            try {
-                const result = await engine.execute(userCommand);
-                loadingLine.textContent = result;
-            } catch (err) {
-                loadingLine.textContent = err;
-                loadingLine.style.color = "#ff5f56";
-            }
-        } else {
-            const systemResponse = await engine.execute(userCommand);
-            if (systemResponse !== "") {
-                buildElement(DOM.terminalContent, 'p', systemResponse, {
+            if (userCommand.trim().startsWith("git push")) {
+                const loadingLine = buildElement(DOM.terminalOutput, 'p', "Pushing to origin...", {
                     className: 'terminal-output',
-                    attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
+                    attributes: { style: 'color: #ccc;' }
                 });
-            }
-        }
-        
-        renderGraph(engine.repo, DOM.graphContainer);
-        DOM.terminalContent.scrollTop = DOM.terminalContent.scrollHeight;
 
-        renderTheoryPanel()
-        
+                try {
+                    const result = await engine.execute(userCommand);
+                    loadingLine.textContent = result;
+                } catch (err) {
+                    loadingLine.textContent = err;
+                    loadingLine.style.color = "#ff5f56";
+                }
+            } else {
+                const systemResponse = await engine.execute(userCommand);
+                if (systemResponse !== "") {
+                    buildElement(DOM.terminalOutput, 'p', systemResponse, {
+                        className: 'terminal-output',
+                        attributes: { style: 'color: #ccc; white-space: pre-wrap;' }
+                    });
+                }
+            }
+
+            renderGraph(engine.repo, DOM.graphContainer);
+            DOM.terminalOutput.scrollTop = DOM.terminalOutput.scrollHeight;
+            renderTheoryPanel();
         }
     });
 }
@@ -1407,7 +1524,7 @@ export function setupTerminalEvents(DOM, engine) {
                 <li class="logo">LOGO</li>
                 <li class="brand">GIT-SIM</li>
                 <li class="chapter">Chapter: Git Basics</li>
-
+                <li><button id="reset-btn" style="cursor:pointer;">Reset</button></li>
             </ul>
         </nav>
 
@@ -1429,8 +1546,11 @@ export function setupTerminalEvents(DOM, engine) {
             </div>
 
             <div class="terminal-content">
-
+                <div class="terminal-output" id="terminal-output"></div>
             </div>
+            <div class="terminal-input-row" id="terminal-input-row"></div>
+
+        </div>
 
 
 
@@ -1479,13 +1599,23 @@ import {renderGraph} from './components/graphRenderer.js';
 
 //selectors
 const DOM = {
-    terminalContent: document.querySelector('.terminal-content'),
+
+    terminalOutput: document.querySelector('#terminal-output'),
+    terminalInputRow: document.querySelector('#terminal-input-row'),
     theoryContent: document.querySelector('.theory-content'),
     graphContainer: document.querySelector('.visual-panel'),
+    resetBtn : document.getElementById('#reset-btn'),
+
+};
 
 
-};const engine = new GitEngine();
+const engine = new GitEngine();
 engine.load();
+
+
+    DOM.resetBtn.addEventListener('click', () => {
+    engine.reset();
+});
 
 export function renderTheoryPanel() {
     DOM.theoryContent.innerHTML = "";
@@ -1493,15 +1623,11 @@ export function renderTheoryPanel() {
     if (!chapter) return;
     buildElement(DOM.theoryContent, 'h1', chapter.title, { className: 'currentChapterHeader' });
     buildElement(DOM.theoryContent, 'p', chapter.text, { className: 'terminal-output-text' });
+    document.getElementById('chapter-label').textContent = `Chapter: ${chapter.title}`;
+
 }
 
 renderTheoryPanel();
-renderGraph(engine.repo, DOM.graphContainer);
-setupTerminalEvents(DOM, engine);
-
-
-
-
 renderGraph(engine.repo, DOM.graphContainer);
 setupTerminalEvents(DOM, engine);
 </file>

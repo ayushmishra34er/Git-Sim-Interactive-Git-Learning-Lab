@@ -10,15 +10,16 @@
 
 <body>
     <header>
-        <nav>
-            <ul>
-                <li class="logo">LOGO</li>
-                <li class="brand">GIT-SIM</li>
-                <li class="chapter">Chapter: Git Basics</li>
-                <li class="chapter">Chapter: Git Basics</li>
-                <li><button id="reset-btn" style="cursor:pointer;">Reset</button></li>
-            </ul>
-        </nav>
+<nav>
+    <div class="nav-left">
+        <span class="logo">LOGO</span>
+        <span class="brand">GIT-SIM</span>
+    </div>
+    <div class="nav-right">
+        <span class="chapter" id="chapter-label">Chapter: Git Basics</span>
+        <button id="reset-btn">Reset</button>
+    </div>
+</nav>
 
 
     </header>
@@ -38,8 +39,11 @@
             </div>
 
             <div class="terminal-content">
-
+                <div class="terminal-output" id="terminal-output"></div>
             </div>
+            <div class="terminal-input-row" id="terminal-input-row"></div>
+
+        </div>
 
 
 

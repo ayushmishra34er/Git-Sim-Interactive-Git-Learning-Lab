@@ -1,102 +1,55 @@
 # Commands Reference
 
-This file is the spec for how each simulated git command should behave — what it checks,
-what it mutates in `repo` state, and what output it returns. Treat this as the source of
-truth when implementing a command: write the row here first, then implement to match it.
-Update this file whenever you add or change a command's behavior.
+Spec for how each simulated git command behaves — what it checks, what it mutates in `repo`
+state, and what output it returns. Update this whenever a command's behavior changes.
 
 ---
 
-## Implemented (v0.4 — v0.5)
+## Implemented (v0.4 — v0.9)
 
-| Command | Preconditions checked | State mutated | Output |
-|---|---|---|---|
-| `git init` | none | `repo.initialized = true` | `"Initialized empty Git repository in /project/.git/"` (or "Reinitialized..." if already initialized) |
-| `git add <file>` | `repo.initialized` must be true | pushes filename into `repo.staged` | `""` (silent, matches real git behavior) |
-| `git add .` | `repo.initialized` must be true | pushes placeholder `"all_modified_files"` into `repo.staged` | `""` |
-| `git commit -m "msg"` | `repo.initialized`, `repo.staged.length > 0` | creates commit object, unshifts into `repo.commits`, clears `repo.staged` | `"[<branch> <id>] <message>\n 1 file changed"` |
-| `git status` | `repo.initialized` | none (read-only) | branch name + staged files, or "nothing to commit, working tree clean" |
-| `git log` | `repo.initialized`, `repo.commits.length > 0` | none (read-only) | formatted list of all commits, most recent first |
-`git branch <name>`|  `git checkout <name>` / `git switch <name>`
+| Command                                     | Preconditions checked                          | State mutated                                                                                                                             | Output                                                                     |
+| ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `git init`                                  | none                                           | `repo.initialized = true`                                                                                                                 | init message, or "Reinitialized..." if already done                        |
+| `git add <file>`                            | `repo.initialized`                             | pushes filename into `repo.staged`                                                                                                        | `""` (silent, matches real git)                                            |
+| `git add .`                                 | `repo.initialized`                             | pushes placeholder `"all_modified_files"` into `repo.staged`                                                                              | `""`                                                                       |
+| `git commit -m "msg"`                       | `repo.initialized`, `repo.staged.length > 0`   | creates `Commit` (with `parentId` from current branch tip), unshifts into `repo.commits`, advances `repo.branches[HEAD]`, clears `staged` | `"[<branch> <id>] <message>"`                                              |
+| `git status`                                | `repo.initialized`                             | none (read-only)                                                                                                                          | branch name + staged files, or clean message                               |
+| `git log`                                   | `repo.initialized`, current branch has commits | none (read-only)                                                                                                                          | history walked via `getHistory()` from branch tip, most recent first       |
+| `git push`                                  | `repo.initialized`                             | none (no real remote state tracked)                                                                                                       | async — "Pushing to origin..." then success after ~2s, via real Promise    |
+| `git branch <name>`                         | `repo.initialized`, name not already taken     | adds entry to `repo.branches` pointing at current HEAD's tip                                                                              | `""` on success, error if name exists                                      |
+| `git checkout <name>` / `git switch <name>` | branch must exist                              | `repo.HEAD = <name>`                                                                                                                      | switch confirmation, or error                                              |
+| `git merge <name>`                          | both branches exist                            | fast-forward: `repo.branches[HEAD]` moves to target tip; diverged: no mutation                                                            | fast-forward message, "Already up to date," or diverged-simulation message |
 
----
-
-## In Progress (v0.5.5)
-
-| Command | Preconditions checked | State mutated | Output |
-|---|---|---|---|
-| `git push` | `repo.initialized` | none yet (simulated — no real remote state tracked) | Async: shows `"Pushing to origin..."` then, after ~2s delay, a success message | `git merge <name>` | both branches must exist | fast-forward: current branch pointer moves to match target; diverged: no mutation | success message, or `"Merge conflict simulation: both branches have diverged"`|
+Chapter progression and `localStorage` persistence happen automatically after every successful
+command via `GitEngine.execute()` — not command-specific, so not listed per-row here.
 
 ---
 
-## Planned (v0.7)
+## Deferred to v2.0+ (do not implement without updating this list first)
 
-| Command | Preconditions checked | State mutated | Output |
-|---|---|---|---|
-|  | `repo.initialized`, name doesn't already exist | adds new entry to `repo.branches` pointing at current HEAD's commit | confirmation, or error if branch exists |
-| | branch must exist | `repo.HEAD = <name>` | `"Switched to branch '<name>'"` or error |
-
-
----
-
-## Deferred to v2.0+ (do not implement before v1.0 ships)
 `rebase`, `cherry-pick`, `bisect`, `reflog`, `stash` (full), `submodules`, `hooks`, `worktree`
 
-Recording these here (not just in ROADMAP.md) so if you're tempted mid-build to add one,
-check here first — it's already been decided these wait until after v1.0.
+**Also deferred, added during v1.0 discussion:**
+
+- **A real fake filesystem** — currently `git add <file>` just stores filename strings with no
+  actual file contents behind them. A genuine v2.0 feature would track real fake file contents
+  so `git diff` and `git add -p` style behavior could be simulated properly. This is a real
+  feature addition, not a bug fix — scope it as its own version if pursued.
 
 ---
 
-## Data model reference (current, as of v0.4/v0.5)
+## Data model (current, as of v0.9/v1.0)
+
 ```js
 repo = {
   initialized: boolean,
-  commits: [ { id, message, timestamp } ],   // will change shape in v0.7 — see below
+  commits: [ Commit, ... ],   // newest-first; each has { id, message, parentId, timestamp }
   staged: [ "filename", ... ],
-  branches: { main: [...] },                  // will change shape in v0.7 — see below
-  HEAD: "main"
+  branches: { branchName: commitId | null },  // each points at that branch's tip commit
+  HEAD: "branchName"
 }
 ```
 
-### Planned data model change at v0.7
-Commits will gain a `parentId` field (linked-list style, mirrors real git internals), and
-`branches` will change from arrays of commit ids to a simple pointer: `{ main: "commit-3" }`.
-This is necessary for the graph visualization to be able to walk commit history. Don't build
-new features on top of the current array-based `branches` shape — it's getting replaced.
-
-
----
-git init
-git add .
-git commit -m "first commit"
-git branch feature
-git checkout feature
-git add .
-git commit -m "feature work"
-git log                      → should show 2 commits (feature branch's history)
-git checkout main
-git log                      → should show only 1 commit (main never moved)
-git merge feature
-git log                      → should now show 2 commits (fast-forwarded)
-git checkout main            (already on main, but test it doesn't break)
-git branch other
-git checkout other
-git add .
-git commit -m "other work"
-git checkout main
-git merge other               → should fast-forward again
-
-
-
-For a genuine divergence test:
-
-git branch a
-git branch b
-git checkout a
-git add . && git commit -m "a commit"
-git checkout b
-git add . && git commit -m "b commit"
-git checkout a
-git merge b     → should print "Merge conflict simulation: both branches have diverged"
-
----
+Commits form a real linked list via `parentId` — this is what `getHistory()`, `log()`, and
+`merge()`'s fast-forward/diverged detection all rely on. Don't change this shape without
+updating all three.
